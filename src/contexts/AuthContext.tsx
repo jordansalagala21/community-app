@@ -30,22 +30,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (user) {
         console.log("Logged in user email:", user.email);
 
-        // Define admin emails - ADD YOUR EMAIL HERE
-        const adminEmails = [
-          "admin@yourcommunity.com",
-          "office@yourcommunity.com",
-          // Add your email below:
-          // "youremail@example.com",
-        ];
-
-        // Check if user is admin:
-        // 1. Email is in the adminEmails list, OR
-        // 2. Email contains "admin", OR
-        // 3. TEMPORARY: Set to true to make ALL users admin (remove this in production!)
+        // User is admin if email contains "admin"
         const userIsAdmin =
-          adminEmails.includes(user.email || "") ||
-          user.email?.toLowerCase().includes("admin") ||
-          true; // <- REMOVE THIS LINE in production to restrict access
+          user.email?.toLowerCase().includes("admin") || false;
 
         console.log("Is admin?", userIsAdmin);
         setIsAdmin(userIsAdmin);

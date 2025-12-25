@@ -50,13 +50,17 @@ export function ProtectedRoute({
             You must be logged in to access this page.
           </Text>
           <Button
-            onClick={() => (window.location.href = "/admin/login")}
+            onClick={() =>
+              (window.location.href = requireAdmin
+                ? "/admin/login"
+                : "/resident/login")
+            }
             bg="navy.500"
             color="white"
             size="lg"
             _hover={{ bg: "navy.600" }}
           >
-            Go to Login
+            {requireAdmin ? "Go to Admin Login" : "Go to Login"}
           </Button>
         </Container>
       </Box>

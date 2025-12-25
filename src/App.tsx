@@ -3,6 +3,10 @@ import { AuthProvider } from "./contexts/AuthContext";
 import Home from "./pages/home";
 import AdminLogin from "./pages/admin-login";
 import Dashboard from "./pages/dashboard";
+import ResidentPortal from "./pages/resident-portal";
+import ResidentLogin from "./pages/resident-login";
+import ResidentSignup from "./pages/resident-signup";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 
 // Create a custom system with navy blue theme colors
 const customConfig = {
@@ -42,6 +46,22 @@ function Router() {
 
   if (path === "/admin/dashboard") {
     return <Dashboard />;
+  }
+
+  if (path === "/resident/login") {
+    return <ResidentLogin />;
+  }
+
+  if (path === "/resident/signup") {
+    return <ResidentSignup />;
+  }
+
+  if (path === "/resident-portal" || path === "/portal") {
+    return (
+      <ProtectedRoute>
+        <ResidentPortal />
+      </ProtectedRoute>
+    );
   }
 
   return <Home />;
