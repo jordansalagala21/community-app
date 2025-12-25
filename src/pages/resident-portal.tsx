@@ -10,10 +10,11 @@ import {
   Stack,
   Text,
   Input,
+  Dialog,
 } from "@chakra-ui/react";
 import { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, updateDoc, doc } from "firebase/firestore";
 import { db } from "../lib/firebase";
 
 type EventItem = {
@@ -27,6 +28,16 @@ type EventItem = {
   price: number;
   isFree?: boolean;
   category: string;
+};
+
+type AnnouncementItem = {
+  id: string;
+  title: string;
+  content: string;
+  priority: string;
+  date: string;
+  status?: string;
+  createdAt?: any;
 };
 
 const EventCard = ({ event }: { event: EventItem }) => {
@@ -212,7 +223,10 @@ const EventCard = ({ event }: { event: EventItem }) => {
 export default function ResidentPortal() {
   const [filterCategory, setFilterCategory] = useState<string>("All");
   const [events, setEvents] = useState<EventItem[]>([]);
+  const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isDeactivateModalOpen, setIsDeactivateModalOpen] = useState(false);
+  const [isDeactivating, setIsDeactivating] = useState(false);
   const { user, logout } = useAuth();
 
   const categories = [
@@ -225,9 +239,10 @@ export default function ResidentPortal() {
     "Service",
   ];
 
-  // Load events from Firestore
+  // Load events and announcements from Firestore
   useEffect(() => {
     loadEvents();
+    loadAnnouncements();
   }, []);
 
   const loadEvents = async () => {
@@ -246,6 +261,27 @@ export default function ResidentPortal() {
     }
   };
 
+  const loadAnnouncements = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, "announcements"));
+      const loadedAnnouncements: AnnouncementItem[] = [];
+      querySnapshot.forEach((doc) => {
+        const announcement = { id: doc.id, ...doc.data() } as AnnouncementItem;
+        // Only show active announcements to residents
+        if (!announcement.status || announcement.status === "active") {
+          loadedAnnouncements.push(announcement);
+        }
+      });
+      // Sort by date, most recent first
+      loadedAnnouncements.sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
+      setAnnouncements(loadedAnnouncements);
+    } catch (error) {
+      console.error("Error loading announcements:", error);
+    }
+  };
+
   const filteredEvents =
     filterCategory === "All"
       ? events
@@ -261,6 +297,30 @@ export default function ResidentPortal() {
       window.location.href = "/";
     } catch (error) {
       console.error("Logout error:", error);
+    }
+  };
+
+  const handleDeactivateAccount = async () => {
+    if (!user?.uid) return;
+
+    try {
+      setIsDeactivating(true);
+
+      // Update user status to deactivated in Firestore
+      const userRef = doc(db, "users", user.uid);
+      await updateDoc(userRef, {
+        status: "deactivated",
+        deactivatedAt: new Date().toISOString(),
+      });
+
+      // Logout and redirect
+      await logout();
+      alert("Your account has been deactivated successfully.");
+      window.location.href = "/";
+    } catch (error) {
+      console.error("Deactivation error:", error);
+      alert("Failed to deactivate account. Please try again.");
+      setIsDeactivating(false);
     }
   };
 
@@ -302,6 +362,15 @@ export default function ResidentPortal() {
                 Home
               </Button>
               <Button
+                variant="ghost"
+                color="white"
+                size="sm"
+                _hover={{ bg: "whiteAlpha.200" }}
+                onClick={() => setIsDeactivateModalOpen(true)}
+              >
+                ⚙️ Settings
+              </Button>
+              <Button
                 bg="red.500"
                 color="white"
                 size="sm"
@@ -323,6 +392,15 @@ export default function ResidentPortal() {
                 onClick={() => (window.location.href = "/")}
               >
                 Home
+              </Button>
+              <Button
+                variant="ghost"
+                color="white"
+                size="sm"
+                _hover={{ bg: "whiteAlpha.200" }}
+                onClick={() => setIsDeactivateModalOpen(true)}
+              >
+                ⚙️
               </Button>
               <Button
                 bg="red.500"
@@ -363,6 +441,133 @@ export default function ResidentPortal() {
           </Stack>
         </Container>
       </Box>
+
+      {/* ANNOUNCEMENTS SECTION */}
+      {announcements.length > 0 && (
+        <Box
+          bg="gradient-to-b"
+          bgGradient="linear(to-b, gray.50, white)"
+          py={{ base: 10, md: 14 }}
+        >
+          <Container maxW="7xl" px={{ base: 4, md: 6 }}>
+            <Flex
+              justify="space-between"
+              align="center"
+              mb={{ base: 6, md: 8 }}
+            >
+              <HStack gap={3}>
+                <Box
+                  fontSize={{ base: "2xl", md: "3xl" }}
+                  bg="navy.100"
+                  p={3}
+                  rounded="xl"
+                >
+                  📢
+                </Box>
+                <Box>
+                  <Heading size={{ base: "lg", md: "xl" }} color="navy.700">
+                    Community Announcements
+                  </Heading>
+                  <Text fontSize="sm" color="gray.600">
+                    {announcements.length} active announcement
+                    {announcements.length !== 1 ? "s" : ""}
+                  </Text>
+                </Box>
+              </HStack>
+            </Flex>
+
+            <SimpleGrid columns={{ base: 1, md: 2 }} gap={{ base: 4, md: 6 }}>
+              {announcements.slice(0, 4).map((announcement) => (
+                <Box
+                  key={announcement.id}
+                  bg="white"
+                  p={{ base: 5, md: 6 }}
+                  rounded="2xl"
+                  shadow="sm"
+                  borderWidth="1px"
+                  borderColor="gray.200"
+                  position="relative"
+                  overflow="hidden"
+                  _hover={{ shadow: "md", transform: "translateY(-2px)" }}
+                  transition="all 0.3s"
+                >
+                  {/* Priority Indicator Strip */}
+                  <Box
+                    position="absolute"
+                    top={0}
+                    left={0}
+                    right={0}
+                    h="4px"
+                    bg={
+                      announcement.priority === "High"
+                        ? "red.500"
+                        : announcement.priority === "Medium"
+                        ? "orange.400"
+                        : announcement.priority === "Low"
+                        ? "blue.400"
+                        : "navy.400"
+                    }
+                  />
+
+                  <Stack gap={3}>
+                    <Flex justify="space-between" align="start" gap={3}>
+                      <Heading size="sm" color="navy.700" flex="1">
+                        {announcement.title}
+                      </Heading>
+                      <Text
+                        fontSize="xs"
+                        fontWeight="semibold"
+                        px={2.5}
+                        py={1}
+                        rounded="md"
+                        bg={
+                          announcement.priority === "High"
+                            ? "red.50"
+                            : announcement.priority === "Medium"
+                            ? "orange.50"
+                            : announcement.priority === "Low"
+                            ? "blue.50"
+                            : "gray.50"
+                        }
+                        color={
+                          announcement.priority === "High"
+                            ? "red.700"
+                            : announcement.priority === "Medium"
+                            ? "orange.700"
+                            : announcement.priority === "Low"
+                            ? "blue.700"
+                            : "gray.700"
+                        }
+                        flexShrink={0}
+                      >
+                        {announcement.priority}
+                      </Text>
+                    </Flex>
+
+                    <Text color="gray.700" fontSize="sm" lineHeight="tall">
+                      {announcement.content}
+                    </Text>
+
+                    <Flex align="center" gap={2} pt={2}>
+                      <Text fontSize="xs" color="gray.500">
+                        📅{" "}
+                        {new Date(announcement.date).toLocaleDateString(
+                          "en-US",
+                          {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          }
+                        )}
+                      </Text>
+                    </Flex>
+                  </Stack>
+                </Box>
+              ))}
+            </SimpleGrid>
+          </Container>
+        </Box>
+      )}
 
       {/* UPCOMING EVENTS SECTION */}
       <Container maxW="7xl" py={{ base: 10, md: 16 }} px={{ base: 4, md: 6 }}>
@@ -546,6 +751,85 @@ export default function ResidentPortal() {
           </Stack>
         </Container>
       </Box>
+
+      {/* Deactivate Account Modal */}
+      <Dialog.Root
+        open={isDeactivateModalOpen}
+        onOpenChange={(e) => setIsDeactivateModalOpen(e.open)}
+      >
+        <Dialog.Backdrop />
+        <Dialog.Positioner>
+          <Dialog.Content>
+            <Dialog.Header>
+              <Dialog.Title>Account Settings</Dialog.Title>
+              <Dialog.CloseTrigger />
+            </Dialog.Header>
+            <Dialog.Body>
+              <Stack gap={6}>
+                <Box>
+                  <Heading size="sm" mb={2} color="navy.700">
+                    Profile Information
+                  </Heading>
+                  <Text fontSize="sm" color="gray.600">
+                    <strong>Email:</strong> {user?.email}
+                  </Text>
+                  <Text fontSize="sm" color="gray.600">
+                    <strong>Name:</strong> {userName}
+                  </Text>
+                </Box>
+
+                <Box
+                  p={4}
+                  bg="red.50"
+                  borderWidth="1px"
+                  borderColor="red.200"
+                  rounded="lg"
+                >
+                  <Heading size="sm" mb={2} color="red.700">
+                    ⚠️ Deactivate Account
+                  </Heading>
+                  <Text fontSize="sm" color="gray.700" mb={3}>
+                    Deactivating your account will:
+                  </Text>
+                  <Stack gap={1} fontSize="sm" color="gray.600" ml={4}>
+                    <Text>• Disable access to the resident portal</Text>
+                    <Text>• Cancel all upcoming event bookings</Text>
+                    <Text>• Remove you from community notifications</Text>
+                  </Stack>
+                  <Text
+                    fontSize="sm"
+                    color="red.600"
+                    mt={3}
+                    fontWeight="medium"
+                  >
+                    This action can be reversed by contacting an administrator.
+                  </Text>
+                  <Button
+                    mt={4}
+                    bg="red.600"
+                    color="white"
+                    size="sm"
+                    width="full"
+                    _hover={{ bg: "red.700" }}
+                    onClick={handleDeactivateAccount}
+                    loading={isDeactivating}
+                  >
+                    Deactivate My Account
+                  </Button>
+                </Box>
+              </Stack>
+            </Dialog.Body>
+            <Dialog.Footer>
+              <Button
+                variant="outline"
+                onClick={() => setIsDeactivateModalOpen(false)}
+              >
+                Close
+              </Button>
+            </Dialog.Footer>
+          </Dialog.Content>
+        </Dialog.Positioner>
+      </Dialog.Root>
     </Box>
   );
 }

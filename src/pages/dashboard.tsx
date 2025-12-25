@@ -39,7 +39,17 @@ type EventItem = {
   category: string;
 };
 
-// Events are now loaded from Firestore
+type AnnouncementItem = {
+  id: string;
+  title: string;
+  content: string;
+  priority: string;
+  date: string;
+  status?: string;
+  createdAt?: any;
+};
+
+// Events and Announcements are now loaded from Firestore
 
 function DashboardContent() {
   const { user, logout } = useAuth();
@@ -51,6 +61,16 @@ function DashboardContent() {
   const [loading, setLoading] = useState(false);
   const [residentsCount, setResidentsCount] = useState(0);
   const [residents, setResidents] = useState<any[]>([]);
+  const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([]);
+  const [isAnnouncementModalOpen, setIsAnnouncementModalOpen] = useState(false);
+  const [editingAnnouncement, setEditingAnnouncement] =
+    useState<AnnouncementItem | null>(null);
+  const [announcementForm, setAnnouncementForm] = useState({
+    title: "",
+    content: "",
+    priority: "Normal",
+    date: "",
+  });
   const [eventForm, setEventForm] = useState({
     title: "",
     date: "",
@@ -67,10 +87,11 @@ function DashboardContent() {
     window.location.href = "/";
   };
 
-  // Load events and residents from Firestore
+  // Load events, residents, and announcements from Firestore
   useEffect(() => {
     loadEvents();
     loadResidents();
+    loadAnnouncements();
   }, []);
 
   const loadResidents = async () => {
@@ -97,6 +118,121 @@ function DashboardContent() {
       setEvents(loadedEvents);
     } catch (error) {
       console.error("Error loading events:", error);
+    }
+  };
+
+  const loadAnnouncements = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, "announcements"));
+      const loadedAnnouncements: AnnouncementItem[] = [];
+      querySnapshot.forEach((doc) => {
+        loadedAnnouncements.push({
+          id: doc.id,
+          ...doc.data(),
+        } as AnnouncementItem);
+      });
+      setAnnouncements(loadedAnnouncements);
+    } catch (error) {
+      console.error("Error loading announcements:", error);
+    }
+  };
+
+  const openNewAnnouncementModal = () => {
+    setEditingAnnouncement(null);
+    setAnnouncementForm({
+      title: "",
+      content: "",
+      priority: "Normal",
+      date: "",
+    });
+    setIsAnnouncementModalOpen(true);
+  };
+
+  const handleCreateAnnouncement = async () => {
+    try {
+      setLoading(true);
+
+      // Validation
+      if (!announcementForm.title.trim()) {
+        alert("Please enter an announcement title");
+        setLoading(false);
+        return;
+      }
+      if (!announcementForm.content.trim()) {
+        alert("Please enter announcement content");
+        setLoading(false);
+        return;
+      }
+      if (!announcementForm.date) {
+        alert("Please select a date");
+        setLoading(false);
+        return;
+      }
+
+      if (editingAnnouncement) {
+        // Update existing announcement
+        const announcementRef = doc(
+          db,
+          "announcements",
+          editingAnnouncement.id
+        );
+        await updateDoc(announcementRef, {
+          title: announcementForm.title,
+          content: announcementForm.content,
+          priority: announcementForm.priority,
+          date: announcementForm.date,
+        });
+      } else {
+        // Create new announcement
+        await addDoc(collection(db, "announcements"), {
+          title: announcementForm.title,
+          content: announcementForm.content,
+          priority: announcementForm.priority,
+          date: announcementForm.date,
+          status: "active",
+          createdAt: new Date().toISOString(),
+        });
+      }
+
+      await loadAnnouncements();
+      setIsAnnouncementModalOpen(false);
+      setEditingAnnouncement(null);
+      setAnnouncementForm({
+        title: "",
+        content: "",
+        priority: "Normal",
+        date: "",
+      });
+    } catch (error) {
+      console.error("Error saving announcement:", error);
+      alert("Failed to save announcement. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleToggleAnnouncementStatus = async (
+    id: string,
+    currentStatus?: string
+  ) => {
+    const isActive = currentStatus === "active";
+    const action = isActive ? "deactivate" : "reactivate";
+
+    if (!confirm(`Are you sure you want to ${action} this announcement?`))
+      return;
+
+    try {
+      const announcementRef = doc(db, "announcements", id);
+      await updateDoc(announcementRef, {
+        status: isActive ? "deactivated" : "active",
+        ...(isActive
+          ? { deactivatedAt: new Date().toISOString() }
+          : { reactivatedAt: new Date().toISOString() }),
+      });
+      await loadAnnouncements();
+    } catch (error) {
+      console.error("Error updating announcement status:", error);
+      alert("Failed to update announcement status");
     }
   };
 
@@ -476,6 +612,7 @@ function DashboardContent() {
                     color="white"
                     _hover={{ bg: "navy.700" }}
                     size="md"
+                    onClick={openNewAnnouncementModal}
                   >
                     <HStack gap={2}>
                       <Text fontSize="lg">📢</Text>
@@ -805,23 +942,144 @@ function DashboardContent() {
                 <Heading size="lg" color="navy.700">
                   Announcements
                 </Heading>
-                <Button bg="navy.600" color="white" _hover={{ bg: "navy.700" }}>
+                <Button
+                  bg="navy.600"
+                  color="white"
+                  _hover={{ bg: "navy.700" }}
+                  onClick={openNewAnnouncementModal}
+                >
                   + New Announcement
                 </Button>
               </Flex>
-              <Box
-                bg="white"
-                rounded="xl"
-                shadow="md"
-                p={6}
-                borderWidth="1px"
-                borderColor="gray.200"
-              >
-                <Text color="gray.600">
-                  Create and manage community announcements, newsletters, and
-                  important notices.
-                </Text>
-              </Box>
+
+              {announcements.length === 0 ? (
+                <Box
+                  bg="white"
+                  rounded="xl"
+                  shadow="md"
+                  p={6}
+                  borderWidth="1px"
+                  borderColor="gray.200"
+                >
+                  <Text color="gray.600" textAlign="center">
+                    No announcements yet. Create your first announcement to get
+                    started.
+                  </Text>
+                </Box>
+              ) : (
+                <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={6}>
+                  {announcements.map((announcement) => (
+                    <Box
+                      key={announcement.id}
+                      bg="white"
+                      p={6}
+                      rounded="xl"
+                      shadow="md"
+                      borderWidth="1px"
+                      borderColor="gray.200"
+                      _hover={{ shadow: "lg" }}
+                      transition="all 0.2s"
+                      opacity={announcement.status === "deactivated" ? 0.6 : 1}
+                    >
+                      <Stack gap={3}>
+                        <Flex justify="space-between" align="start">
+                          <Box flex="1">
+                            <HStack gap={2} mb={2}>
+                              <Text
+                                fontSize="xs"
+                                fontWeight="bold"
+                                px={2}
+                                py={1}
+                                rounded="md"
+                                bg={
+                                  announcement.priority === "High"
+                                    ? "red.100"
+                                    : announcement.priority === "Medium"
+                                    ? "orange.100"
+                                    : "blue.100"
+                                }
+                                color={
+                                  announcement.priority === "High"
+                                    ? "red.700"
+                                    : announcement.priority === "Medium"
+                                    ? "orange.700"
+                                    : "blue.700"
+                                }
+                              >
+                                {announcement.priority}
+                              </Text>
+                              {announcement.status === "deactivated" && (
+                                <Text
+                                  fontSize="xs"
+                                  fontWeight="bold"
+                                  px={2}
+                                  py={1}
+                                  rounded="md"
+                                  bg="gray.200"
+                                  color="gray.700"
+                                >
+                                  Deactivated
+                                </Text>
+                              )}
+                            </HStack>
+                            <Heading size="sm" color="navy.700" mb={2}>
+                              {announcement.title}
+                            </Heading>
+                          </Box>
+                        </Flex>
+                        <Text fontSize="sm" color="gray.600" lineClamp={3}>
+                          {announcement.content}
+                        </Text>
+                        <Text fontSize="xs" color="gray.500">
+                          📅 {new Date(announcement.date).toLocaleDateString()}
+                        </Text>
+                        <HStack gap={2} mt={2}>
+                          <IconButton
+                            aria-label="Edit announcement"
+                            size="sm"
+                            variant="ghost"
+                            colorScheme="blue"
+                            onClick={() => {
+                              setEditingAnnouncement(announcement);
+                              setAnnouncementForm({
+                                title: announcement.title,
+                                content: announcement.content,
+                                priority: announcement.priority,
+                                date: announcement.date,
+                              });
+                              setIsAnnouncementModalOpen(true);
+                            }}
+                          >
+                            ✏️
+                          </IconButton>
+                          <IconButton
+                            aria-label={
+                              announcement.status === "active"
+                                ? "Deactivate announcement"
+                                : "Reactivate announcement"
+                            }
+                            size="sm"
+                            variant="ghost"
+                            colorScheme={
+                              announcement.status === "active"
+                                ? "orange"
+                                : "green"
+                            }
+                            onClick={() =>
+                              handleToggleAnnouncementStatus(
+                                announcement.id,
+                                announcement.status
+                              )
+                            }
+                          >
+                            {announcement.status === "active" ? "🔕" : "🔔"}
+                          </IconButton>
+                        </HStack>
+                      </Stack>
+                    </Box>
+                  ))}
+                </SimpleGrid>
+              )}
             </Stack>
           )}
 
@@ -1022,6 +1280,147 @@ function DashboardContent() {
                   loading={loading}
                 >
                   {editingEvent ? "Update Event" : "Create Event"}
+                </Button>
+              </HStack>
+            </Dialog.Footer>
+          </Dialog.Content>
+        </Dialog.Positioner>
+      </Dialog.Root>
+
+      {/* Announcement Creation/Edit Modal */}
+      <Dialog.Root
+        open={isAnnouncementModalOpen}
+        onOpenChange={(e) => setIsAnnouncementModalOpen(e.open)}
+        size="lg"
+      >
+        <Dialog.Backdrop />
+        <Dialog.Positioner>
+          <Dialog.Content>
+            <Dialog.Header>
+              <Dialog.Title>
+                {editingAnnouncement
+                  ? "Edit Announcement"
+                  : "Create New Announcement"}
+              </Dialog.Title>
+              <Dialog.CloseTrigger />
+            </Dialog.Header>
+            <Dialog.Body>
+              <Stack gap={4}>
+                <Box>
+                  <Text mb={2} fontWeight="medium">
+                    Title *
+                  </Text>
+                  <Input
+                    placeholder="Enter announcement title"
+                    value={announcementForm.title}
+                    onChange={(e) =>
+                      setAnnouncementForm({
+                        ...announcementForm,
+                        title: e.target.value,
+                      })
+                    }
+                  />
+                </Box>
+
+                <Box>
+                  <Text mb={2} fontWeight="medium">
+                    Content *
+                  </Text>
+                  <Textarea
+                    placeholder="Enter announcement content"
+                    value={announcementForm.content}
+                    onChange={(e) =>
+                      setAnnouncementForm({
+                        ...announcementForm,
+                        content: e.target.value,
+                      })
+                    }
+                    rows={5}
+                  />
+                </Box>
+
+                <Box>
+                  <Text mb={2} fontWeight="medium">
+                    Priority *
+                  </Text>
+                  <HStack gap={2}>
+                    {["Low", "Normal", "Medium", "High"].map((priority) => (
+                      <Button
+                        key={priority}
+                        size="sm"
+                        onClick={() =>
+                          setAnnouncementForm({
+                            ...announcementForm,
+                            priority,
+                          })
+                        }
+                        bg={
+                          announcementForm.priority === priority
+                            ? "navy.600"
+                            : "white"
+                        }
+                        color={
+                          announcementForm.priority === priority
+                            ? "white"
+                            : "gray.700"
+                        }
+                        borderWidth="1px"
+                        borderColor="gray.300"
+                        _hover={{
+                          bg:
+                            announcementForm.priority === priority
+                              ? "navy.700"
+                              : "gray.100",
+                        }}
+                      >
+                        {priority}
+                      </Button>
+                    ))}
+                  </HStack>
+                </Box>
+
+                <Box>
+                  <Text mb={2} fontWeight="medium">
+                    Date *
+                  </Text>
+                  <Input
+                    type="date"
+                    value={announcementForm.date}
+                    onChange={(e) =>
+                      setAnnouncementForm({
+                        ...announcementForm,
+                        date: e.target.value,
+                      })
+                    }
+                  />
+                </Box>
+
+                <Text fontSize="xs" color="gray.500">
+                  * Required fields
+                </Text>
+              </Stack>
+            </Dialog.Body>
+            <Dialog.Footer>
+              <HStack gap={3}>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsAnnouncementModalOpen(false);
+                    setEditingAnnouncement(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  bg="navy.600"
+                  color="white"
+                  _hover={{ bg: "navy.700" }}
+                  onClick={handleCreateAnnouncement}
+                  loading={loading}
+                >
+                  {editingAnnouncement
+                    ? "Update Announcement"
+                    : "Create Announcement"}
                 </Button>
               </HStack>
             </Dialog.Footer>
