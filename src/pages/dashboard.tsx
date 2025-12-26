@@ -12,6 +12,8 @@ import {
   IconButton,
   Textarea,
   Dialog,
+  createToaster,
+  Toaster,
 } from "@chakra-ui/react";
 import { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
@@ -42,6 +44,12 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
+import emailjs from "@emailjs/browser";
+
+const toaster = createToaster({
+  placement: "top-end",
+  duration: 4000,
+});
 
 type EventItem = {
   id: string;
@@ -212,12 +220,36 @@ function DashboardContent() {
     try {
       const querySnapshot = await getDocs(collection(db, "clubhouse"));
       const loadedReservations: ClubhouseReservation[] = [];
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Reset to start of day for accurate comparison
+
       querySnapshot.forEach((doc) => {
         loadedReservations.push({
           id: doc.id,
           ...doc.data(),
         } as ClubhouseReservation);
       });
+
+      // Auto-update past approved reservations to "completed"
+      for (const reservation of loadedReservations) {
+        if (reservation.status === "approved") {
+          const reservationDate = new Date(reservation.date);
+          reservationDate.setHours(0, 0, 0, 0);
+
+          // If reservation date is in the past, mark as completed
+          if (reservationDate < today) {
+            try {
+              await updateDoc(doc(db, "clubhouse", reservation.id), {
+                status: "completed",
+              });
+              reservation.status = "completed";
+            } catch (error) {
+              console.error("Error updating reservation status:", error);
+            }
+          }
+        }
+      }
+
       // Sort by date and time
       loadedReservations.sort((a, b) => {
         const dateCompare =
@@ -321,10 +353,16 @@ function DashboardContent() {
         status: "approved",
       });
       await loadClubhouseReservations();
-      alert("Reservation approved successfully!");
+      toaster.success({
+        title: "Reservation Approved",
+        description: "Clubhouse reservation has been approved successfully!",
+      });
     } catch (error) {
       console.error("Error approving reservation:", error);
-      alert("Failed to approve reservation");
+      toaster.error({
+        title: "Approval Failed",
+        description: "Failed to approve reservation. Please try again.",
+      });
     }
   };
 
@@ -341,10 +379,156 @@ function DashboardContent() {
         status: "rejected",
       });
       await loadClubhouseReservations();
-      alert("Reservation rejected.");
+      toaster.success({
+        title: "Reservation Rejected",
+        description: "Clubhouse reservation has been rejected.",
+      });
     } catch (error) {
       console.error("Error rejecting reservation:", error);
-      alert("Failed to reject reservation");
+      toaster.error({
+        title: "Rejection Failed",
+        description: "Failed to reject reservation. Please try again.",
+      });
+    }
+  };
+
+  const handleApproveAccount = async (resident: any) => {
+    try {
+      await updateDoc(doc(db, "users", resident.id), {
+        isApproved: true,
+        status: "approved",
+        approvedAt: new Date().toISOString(),
+      });
+
+      // Send approval email notification
+      await sendApprovalEmail(resident);
+
+      await loadResidents();
+      toaster.success({
+        title: "Account Approved",
+        description: `${resident.name}'s account has been approved and notification email sent!`,
+      });
+    } catch (error) {
+      console.error("Error approving account:", error);
+      toaster.error({
+        title: "Approval Failed",
+        description: "Failed to approve account. Please try again.",
+      });
+    }
+  };
+
+  const sendApprovalEmail = async (resident: any) => {
+    try {
+      const SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID;
+      const TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
+      const PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
+
+      console.log("EmailJS Config Check:");
+      console.log("- Service ID:", SERVICE_ID ? "✓ Set" : "✗ Missing");
+      console.log("- Template ID:", TEMPLATE_ID ? "✓ Set" : "✗ Missing");
+      console.log("- Public Key:", PUBLIC_KEY ? "✓ Set" : "✗ Missing");
+
+      if (!SERVICE_ID || !TEMPLATE_ID || !PUBLIC_KEY) {
+        console.error(
+          "EmailJS not configured properly. Please check your .env file and restart the dev server."
+        );
+        toaster.warning({
+          title: "Email Service Not Configured",
+          description:
+            "Email notification could not be sent. Please contact administrator.",
+        });
+        return;
+      }
+
+      const templateParams = {
+        to_email: resident.email,
+        to_name: resident.name,
+        from_name: "HOA Administration",
+        reply_to: resident.email,
+        message: `
+
+Great news! Your account for the HOA Community Portal has been approved.
+
+You can now log in and access all portal features:
+- View community events and book tickets
+- Reserve the clubhouse
+- View community announcements
+- And more!
+
+Login here: ${window.location.origin}/resident/login
+
+Welcome to our community!
+
+`,
+        login_link: `${window.location.origin}/resident/login`,
+      };
+
+      console.log("Sending email with params:", templateParams);
+      console.log("Recipient email:", resident.email);
+      console.log("Using Service ID:", SERVICE_ID);
+
+      const response = await emailjs.send(
+        SERVICE_ID,
+        TEMPLATE_ID,
+        templateParams,
+        PUBLIC_KEY
+      );
+
+      console.log("✓ Email sent successfully!", response);
+      console.log("Status:", response.status);
+      console.log("Text:", response.text);
+    } catch (error) {
+      console.error("Error sending approval email:", error);
+      // Don't throw error - account is still approved even if email fails
+    }
+  };
+
+  const handleRejectAccount = async (resident: any) => {
+    if (
+      !confirm(
+        `Are you sure you want to reject ${resident.name}'s account? This will permanently delete their account.`
+      )
+    )
+      return;
+
+    try {
+      // Delete the user document from Firestore
+      await deleteDoc(doc(db, "users", resident.id));
+      await loadResidents();
+      toaster.success({
+        title: "Account Rejected",
+        description: `${resident.name}'s account has been rejected and deleted.`,
+      });
+    } catch (error) {
+      console.error("Error rejecting account:", error);
+      toaster.error({
+        title: "Rejection Failed",
+        description: "Failed to reject account. Please try again.",
+      });
+    }
+  };
+
+  const handleDeleteResident = async (resident: any) => {
+    if (
+      !confirm(
+        `Are you sure you want to permanently delete ${resident.name}'s account? This action cannot be undone.`
+      )
+    )
+      return;
+
+    try {
+      await deleteDoc(doc(db, "users", resident.id));
+      await loadResidents();
+      toaster.success({
+        title: "Resident Deleted",
+        description: `${resident.name}'s account has been permanently deleted.`,
+      });
+    } catch (error) {
+      console.error("Error deleting resident:", error);
+      toaster.error({
+        title: "Deletion Failed",
+        description: "Failed to delete resident. Please try again.",
+      });
     }
   };
 
@@ -792,6 +976,10 @@ function DashboardContent() {
     (res) => res.status === "pending"
   ).length;
 
+  const pendingAccountsCount = residents.filter(
+    (res) => res.isApproved === false || res.status === "pending"
+  ).length;
+
   const stats = [
     {
       label: "Total Residents",
@@ -806,6 +994,16 @@ function DashboardContent() {
       icon: Calendar,
       change: events.length === 0 ? "No events created" : "Community events",
       color: "purple",
+    },
+    {
+      label: "Pending Accounts",
+      value: pendingAccountsCount.toString(),
+      icon: UserCircle,
+      change:
+        pendingAccountsCount === 0
+          ? "No pending approvals"
+          : "Awaiting approval",
+      color: "yellow",
     },
     {
       label: "Pending Reservations",
@@ -1612,6 +1810,72 @@ function DashboardContent() {
                               : "N/A"}
                           </Text>
                         </Stack>
+
+                        {/* Approval/Status section */}
+                        {resident.status === "pending" ||
+                        resident.isApproved === false ? (
+                          <Stack gap={2}>
+                            <Text
+                              fontSize="xs"
+                              fontWeight="bold"
+                              color="orange.600"
+                            >
+                              Status: Pending Approval
+                            </Text>
+                            <HStack gap={2}>
+                              <Button
+                                size="sm"
+                                colorScheme="green"
+                                onClick={() => handleApproveAccount(resident)}
+                              >
+                                Approve
+                              </Button>
+                              <Button
+                                size="sm"
+                                colorScheme="red"
+                                variant="outline"
+                                onClick={() => handleRejectAccount(resident)}
+                              >
+                                Reject
+                              </Button>
+                            </HStack>
+                          </Stack>
+                        ) : resident.isActive === false ? (
+                          <Stack gap={2}>
+                            <Text
+                              fontSize="xs"
+                              fontWeight="bold"
+                              color="red.600"
+                            >
+                              Status: Deactivated
+                            </Text>
+                            <Button
+                              size="sm"
+                              colorScheme="red"
+                              onClick={() => handleDeleteResident(resident)}
+                            >
+                              Delete Account
+                            </Button>
+                          </Stack>
+                        ) : (
+                          <Stack gap={2}>
+                            <Text
+                              fontSize="xs"
+                              fontWeight="bold"
+                              color="green.600"
+                            >
+                              Status: Active
+                            </Text>
+                            <Button
+                              size="sm"
+                              colorScheme="red"
+                              variant="outline"
+                              onClick={() => handleDeleteResident(resident)}
+                            >
+                              Delete Account
+                            </Button>
+                          </Stack>
+                        )}
 
                         {/* <Button
                           size="sm"
@@ -3095,6 +3359,25 @@ function DashboardContent() {
 export default function Dashboard() {
   return (
     <ProtectedRoute requireAdmin={true}>
+      <Toaster toaster={toaster}>
+        {(toast) => (
+          <Box
+            bg="white"
+            p={4}
+            rounded="md"
+            shadow="lg"
+            borderWidth="1px"
+            borderColor="gray.200"
+          >
+            <Text fontWeight="bold">{toast.title}</Text>
+            {toast.description && (
+              <Text fontSize="sm" color="gray.600">
+                {toast.description}
+              </Text>
+            )}
+          </Box>
+        )}
+      </Toaster>
       <DashboardContent />
     </ProtectedRoute>
   );

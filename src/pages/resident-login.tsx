@@ -12,6 +12,8 @@ import {
   HStack,
 } from "@chakra-ui/react";
 import { useAuth } from "../contexts/AuthContext";
+import { doc, getDoc } from "firebase/firestore";
+import { db, auth } from "../lib/firebase";
 
 export default function ResidentLogin() {
   const [email, setEmail] = useState("");
@@ -27,6 +29,34 @@ export default function ResidentLogin() {
 
     try {
       await login(email, password);
+
+      // Check if user account is approved
+      if (auth.currentUser) {
+        const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
+
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+
+          // Check if account is approved
+          if (userData.isApproved === false || userData.status === "pending") {
+            setError(
+              "Your account is pending admin approval. Please wait for approval before logging in."
+            );
+            setLoading(false);
+            return;
+          }
+
+          // Check if account is deactivated
+          if (userData.isActive === false) {
+            setError(
+              "Your account has been deactivated. Please contact the administrator."
+            );
+            setLoading(false);
+            return;
+          }
+        }
+      }
+
       // Redirect to resident portal after successful login
       window.location.href = "/resident-portal";
     } catch (err: any) {

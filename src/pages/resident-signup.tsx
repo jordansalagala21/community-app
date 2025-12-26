@@ -10,10 +10,17 @@ import {
   Text,
   VStack,
   HStack,
+  createToaster,
+  Toaster,
 } from "@chakra-ui/react";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 import { auth, db } from "../lib/firebase";
+
+const toaster = createToaster({
+  placement: "top",
+  duration: 5000,
+});
 
 export default function ResidentSignup() {
   const [email, setEmail] = useState("");
@@ -86,10 +93,22 @@ export default function ResidentSignup() {
         address: address,
         createdAt: new Date().toISOString(),
         role: "resident",
+        isApproved: false,
+        status: "pending",
       });
 
-      // Redirect to resident portal after successful signup
-      window.location.href = "/resident-portal";
+      // Show pending approval message with toaster
+      toaster.success({
+        title: "Account Created Successfully! 🎉",
+        description:
+          "Your account is pending admin approval. You will be notified via email once approved.",
+        duration: 6000,
+      });
+
+      // Redirect after a short delay
+      setTimeout(() => {
+        window.location.href = "/resident/login";
+      }, 2000);
     } catch (err: any) {
       if (err.code === "auth/email-already-in-use") {
         setError("This email is already registered. Please sign in instead.");
@@ -112,6 +131,28 @@ export default function ResidentSignup() {
       position="relative"
       overflow="hidden"
     >
+      <Toaster toaster={toaster}>
+        {(toast) => (
+          <Box
+            bg={
+              toast.type === "success"
+                ? "green.500"
+                : toast.type === "error"
+                ? "red.500"
+                : "blue.500"
+            }
+            color="white"
+            p={4}
+            rounded="md"
+            shadow="lg"
+          >
+            <Text fontWeight="bold">{toast.title}</Text>
+            {toast.description && (
+              <Text fontSize="sm">{toast.description}</Text>
+            )}
+          </Box>
+        )}
+      </Toaster>
       {/* Background Decorative Elements */}
       <Box
         position="absolute"
