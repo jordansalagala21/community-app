@@ -25,6 +25,23 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
+import {
+  Users,
+  Calendar,
+  Clock,
+  DollarSign,
+  Building2,
+  TrendingUp,
+  LayoutDashboard,
+  CalendarDays,
+  UserCircle,
+  Home,
+  Megaphone,
+  Settings,
+  LogOut,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 
 type EventItem = {
   id: string;
@@ -71,6 +88,7 @@ function DashboardContent() {
   const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState("overview");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const [events, setEvents] = useState<EventItem[]>([]);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<EventItem | null>(null);
@@ -778,21 +796,21 @@ function DashboardContent() {
     {
       label: "Total Residents",
       value: residentsCount.toString(),
-      icon: "👥",
+      icon: Users,
       change: residentsCount === 0 ? "No residents yet" : "Registered users",
       color: "blue",
     },
     {
       label: "Active Events",
       value: events.length.toString(),
-      icon: "🎉",
+      icon: Calendar,
       change: events.length === 0 ? "No events created" : "Community events",
       color: "purple",
     },
     {
       label: "Pending Reservations",
       value: pendingReservationsCount.toString(),
-      icon: "📅",
+      icon: Clock,
       change:
         pendingReservationsCount === 0
           ? "No pending requests"
@@ -802,14 +820,14 @@ function DashboardContent() {
     {
       label: "Event Revenue",
       value: `$${eventRevenue.toFixed(2)}`,
-      icon: "🎫",
+      icon: DollarSign,
       change: eventRevenue === 0 ? "No ticket sales" : "From ticket bookings",
       color: "teal",
     },
     {
       label: "Clubhouse Revenue",
       value: `$${clubhouseRevenue.toFixed(2)}`,
-      icon: "🏠",
+      icon: Building2,
       change:
         clubhouseRevenue === 0 ? "No deposits" : "From approved reservations",
       color: "cyan",
@@ -817,87 +835,145 @@ function DashboardContent() {
     {
       label: "Total Revenue",
       value: `$${totalRevenue.toFixed(2)}`,
-      icon: "💰",
+      icon: TrendingUp,
       change: totalRevenue === 0 ? "No revenue yet" : "Events + Clubhouse",
       color: "green",
     },
   ];
 
   const menuItems = [
-    { id: "overview", icon: "📊", label: "Overview" },
-    { id: "events", icon: "🎉", label: "Events" },
-    { id: "residents", icon: "👥", label: "Residents" },
-    { id: "reservations", icon: "📅", label: "Reservations" },
-    { id: "announcements", icon: "📢", label: "Announcements" },
-    { id: "settings", icon: "⚙️", label: "Settings" },
+    { id: "overview", icon: LayoutDashboard, label: "Overview" },
+    { id: "events", icon: CalendarDays, label: "Events" },
+    { id: "residents", icon: UserCircle, label: "Residents" },
+    { id: "reservations", icon: Home, label: "Reservations" },
+    { id: "announcements", icon: Megaphone, label: "Announcements" },
+    { id: "settings", icon: Settings, label: "Settings" },
   ];
 
   // Sidebar Component
-  const Sidebar = ({ isMobile = false }) => (
-    <Box
-      w={{ base: "full", md: "260px" }}
-      bg="navy.800"
-      minH={{ base: "auto", md: "100vh" }}
-      color="white"
-      position={{ base: "relative", md: "fixed" }}
-      left="0"
-      top="0"
-      overflowY="auto"
-    >
-      <Box p={6} borderBottomWidth="1px" borderBottomColor="whiteAlpha.200">
-        <Heading size="md" color="white">
-          🏠 HOA Admin
-        </Heading>
-        <Text fontSize="xs" color="whiteAlpha.700" mt={1}>
-          Management Portal
-        </Text>
-      </Box>
+  const Sidebar = ({ isMobile = false }) => {
+    const sidebarWidth = isMobile ? "260px" : isCollapsed ? "80px" : "260px";
 
-      <VStack gap={1} p={4} align="stretch">
-        {menuItems.map((item) => (
-          <Button
-            key={item.id}
-            onClick={() => {
-              setActiveTab(item.id);
-              if (isMobile) setIsSidebarOpen(false);
-            }}
-            variant="ghost"
-            color={activeTab === item.id ? "white" : "whiteAlpha.700"}
-            bg={activeTab === item.id ? "navy.600" : "transparent"}
-            justifyContent="flex-start"
-            px={4}
-            py={6}
-            fontWeight={activeTab === item.id ? "bold" : "normal"}
-            _hover={{
-              bg: activeTab === item.id ? "navy.600" : "whiteAlpha.100",
-              color: "white",
-            }}
-          >
-            <HStack gap={3}>
-              <Text fontSize="xl">{item.icon}</Text>
-              <Text>{item.label}</Text>
-            </HStack>
-          </Button>
-        ))}
-      </VStack>
-
-      <Box p={4} mt="auto" borderTopWidth="1px" borderTopColor="whiteAlpha.200">
-        <Button
-          onClick={handleLogout}
-          variant="ghost"
-          color="red.300"
-          width="full"
-          justifyContent="flex-start"
-          _hover={{ bg: "red.900", color: "white" }}
+    return (
+      <Box
+        w={{ base: "full", md: sidebarWidth }}
+        bg="navy.800"
+        minH={{ base: "auto", md: "100vh" }}
+        color="white"
+        position={{ base: "relative", md: "fixed" }}
+        left="0"
+        top="0"
+        overflowY="auto"
+        transition="width 0.3s ease"
+      >
+        <Box
+          p={isCollapsed && !isMobile ? 4 : 6}
+          borderBottomWidth="1px"
+          borderBottomColor="whiteAlpha.200"
         >
-          <HStack gap={3}>
-            <Text fontSize="xl">🚪</Text>
-            <Text>Logout</Text>
-          </HStack>
-        </Button>
+          {!isCollapsed || isMobile ? (
+            <>
+              <Heading size="md" color="white">
+                HOA Admin
+              </Heading>
+              <Text fontSize="xs" color="whiteAlpha.700" mt={1}>
+                Management Portal
+              </Text>
+            </>
+          ) : (
+            <Heading size="md" color="white" textAlign="center">
+              HA
+            </Heading>
+          )}
+        </Box>
+
+        {/* Toggle button - only on desktop */}
+        {!isMobile && (
+          <Box p={2} borderBottomWidth="1px" borderBottomColor="whiteAlpha.200">
+            <Button
+              onClick={() => setIsCollapsed(!isCollapsed)}
+              variant="ghost"
+              color="whiteAlpha.700"
+              width="full"
+              size="sm"
+              justifyContent={isCollapsed ? "center" : "flex-start"}
+              _hover={{ bg: "whiteAlpha.100", color: "white" }}
+            >
+              {isCollapsed ? (
+                <Box as={ChevronRight} width="20px" height="20px" />
+              ) : (
+                <HStack gap={2}>
+                  <Box as={ChevronLeft} width="20px" height="20px" />
+                  <Text fontSize="sm">Collapse</Text>
+                </HStack>
+              )}
+            </Button>
+          </Box>
+        )}
+
+        <VStack gap={1} p={4} align="stretch">
+          {menuItems.map((item) => (
+            <Button
+              key={item.id}
+              onClick={() => {
+                setActiveTab(item.id);
+                if (isMobile) setIsSidebarOpen(false);
+              }}
+              variant="ghost"
+              color={activeTab === item.id ? "white" : "whiteAlpha.700"}
+              bg={activeTab === item.id ? "navy.600" : "transparent"}
+              justifyContent={
+                isCollapsed && !isMobile ? "center" : "flex-start"
+              }
+              px={4}
+              py={6}
+              fontWeight={activeTab === item.id ? "bold" : "normal"}
+              _hover={{
+                bg: activeTab === item.id ? "navy.600" : "whiteAlpha.100",
+                color: "white",
+              }}
+              title={isCollapsed && !isMobile ? item.label : undefined}
+            >
+              {!isCollapsed || isMobile ? (
+                <HStack gap={3}>
+                  <Box as={item.icon} width="20px" height="20px" />
+                  <Text>{item.label}</Text>
+                </HStack>
+              ) : (
+                <Box as={item.icon} width="20px" height="20px" />
+              )}
+            </Button>
+          ))}
+        </VStack>
+
+        <Box
+          p={4}
+          mt="auto"
+          borderTopWidth="1px"
+          borderTopColor="whiteAlpha.200"
+        >
+          <Button
+            onClick={handleLogout}
+            variant="ghost"
+            color="red.300"
+            width="full"
+            justifyContent={isCollapsed && !isMobile ? "center" : "flex-start"}
+            _hover={{ bg: "red.900", color: "white" }}
+            title={isCollapsed && !isMobile ? "Logout" : undefined}
+          >
+            {!isCollapsed || isMobile ? (
+              <HStack gap={3}>
+                <Box as={LogOut} width="20px" height="20px" />
+                <Text>Logout</Text>
+              </HStack>
+            ) : (
+              <Box as={LogOut} width="20px" height="20px" />
+            )}
+          </Button>
+        </Box>
       </Box>
-    </Box>
-  );
+    );
+  };
 
   return (
     <Box bg="gray.50" minH="100vh">
@@ -931,7 +1007,11 @@ function DashboardContent() {
       </Box>
 
       {/* Main Content Area */}
-      <Box ml={{ base: 0, md: "260px" }} minH="100vh">
+      <Box
+        ml={{ base: 0, md: isCollapsed ? "80px" : "260px" }}
+        minH="100vh"
+        transition="margin-left 0.3s ease"
+      >
         {/* Top Navbar */}
         <Box
           bg="white"
@@ -953,7 +1033,7 @@ function DashboardContent() {
                 variant="ghost"
                 fontSize="24px"
               >
-                ☰
+                Menu
               </IconButton>
               <Box>
                 <Heading size={{ base: "sm", md: "md" }} color="navy.700">
@@ -1008,7 +1088,7 @@ function DashboardContent() {
                 color="white"
               >
                 <Heading size={{ base: "lg", md: "xl" }} mb={2}>
-                  Welcome back, Admin! 👋
+                  Welcome back, Admin!
                 </Heading>
                 <Text fontSize={{ base: "sm", md: "md" }} opacity={0.9}>
                   Here's what's happening in your community today
@@ -1074,7 +1154,7 @@ function DashboardContent() {
                           p={3}
                           rounded="xl"
                         >
-                          <Text fontSize="3xl">{stat.icon}</Text>
+                          <Box as={stat.icon} width="28px" height="28px" />
                         </Box>
                         <Box textAlign="right">
                           <Text
@@ -1117,9 +1197,6 @@ function DashboardContent() {
                   borderColor="gray.100"
                 >
                   <Flex align="center" gap={3} mb={5}>
-                    <Box bg="navy.50" p={2} rounded="lg">
-                      <Text fontSize="2xl">⚡</Text>
-                    </Box>
                     <Heading size="md" color="navy.700">
                       Quick Actions
                     </Heading>
@@ -1136,7 +1213,6 @@ function DashboardContent() {
                       onClick={openNewAnnouncementModal}
                     >
                       <VStack gap={1}>
-                        <Text fontSize="2xl">📢</Text>
                         <Text fontSize="sm" fontWeight="semibold">
                           New Announcement
                         </Text>
@@ -1153,7 +1229,6 @@ function DashboardContent() {
                       onClick={() => setActiveTab("events")}
                     >
                       <VStack gap={1}>
-                        <Text fontSize="2xl">🎉</Text>
                         <Text fontSize="sm" fontWeight="semibold">
                           Manage Events
                         </Text>
@@ -1170,7 +1245,6 @@ function DashboardContent() {
                       onClick={() => setActiveTab("reservations")}
                     >
                       <VStack gap={1}>
-                        <Text fontSize="2xl">📅</Text>
                         <Text fontSize="sm" fontWeight="semibold">
                           Reservations
                         </Text>
@@ -1187,7 +1261,6 @@ function DashboardContent() {
                       onClick={() => setActiveTab("residents")}
                     >
                       <VStack gap={1}>
-                        <Text fontSize="2xl">👥</Text>
                         <Text fontSize="sm" fontWeight="semibold">
                           View Residents
                         </Text>
@@ -1206,9 +1279,6 @@ function DashboardContent() {
                   borderColor="gray.100"
                 >
                   <Flex align="center" gap={3} mb={5}>
-                    <Box bg="green.50" p={2} rounded="lg">
-                      <Text fontSize="2xl">📊</Text>
-                    </Box>
                     <Heading size="md" color="navy.700">
                       Quick Stats
                     </Heading>
@@ -1353,18 +1423,15 @@ function DashboardContent() {
                       </Flex>
 
                       <Stack gap={1} fontSize="sm" color="gray.600">
-                        <HStack gap={2}>
-                          <Text fontWeight="semibold">📅</Text>
-                          <Text fontSize="xs">{event.date}</Text>
-                        </HStack>
-                        <HStack gap={2}>
-                          <Text fontWeight="semibold">🕐</Text>
-                          <Text fontSize="xs">{event.time}</Text>
-                        </HStack>
-                        <HStack gap={2}>
-                          <Text fontWeight="semibold">📍</Text>
-                          <Text fontSize="xs">{event.location}</Text>
-                        </HStack>
+                        <Text fontSize="xs" fontWeight="semibold">
+                          Date: {event.date}
+                        </Text>
+                        <Text fontSize="xs" fontWeight="semibold">
+                          Time: {event.time}
+                        </Text>
+                        <Text fontSize="xs" fontWeight="semibold">
+                          Location: {event.location}
+                        </Text>
                       </Stack>
 
                       <Text color="gray.700" fontSize="sm" lineHeight="1.5">
@@ -1502,8 +1569,10 @@ function DashboardContent() {
                             alignItems="center"
                             justifyContent="center"
                             fontSize="2xl"
+                            fontWeight="bold"
+                            color="navy.700"
                           >
-                            👤
+                            U
                           </Box>
                           <Box flex="1">
                             <Heading size="sm" color="navy.700">
@@ -1516,35 +1585,32 @@ function DashboardContent() {
                         </Flex>
 
                         <Stack gap={2} fontSize="sm">
-                          <HStack gap={2}>
-                            <Text fontWeight="semibold" color="gray.700">
-                              📧
-                            </Text>
-                            <Text color="gray.600" fontSize="xs">
-                              {resident.email || "N/A"}
-                            </Text>
-                          </HStack>
-                          <HStack gap={2}>
-                            <Text fontWeight="semibold" color="gray.700">
-                              🏠
-                            </Text>
-                            <Text color="gray.600" fontSize="xs">
-                              {resident.address || "No address"}
-                            </Text>
-                          </HStack>
-                          <HStack gap={2}>
-                            <Text fontWeight="semibold" color="gray.700">
-                              📅
-                            </Text>
-                            <Text color="gray.600" fontSize="xs">
-                              Joined:{" "}
-                              {resident.createdAt
-                                ? new Date(
-                                    resident.createdAt
-                                  ).toLocaleDateString()
-                                : "N/A"}
-                            </Text>
-                          </HStack>
+                          <Text
+                            fontWeight="semibold"
+                            color="gray.700"
+                            fontSize="xs"
+                          >
+                            Email: {resident.email || "N/A"}
+                          </Text>
+                          <Text
+                            fontWeight="semibold"
+                            color="gray.700"
+                            fontSize="xs"
+                          >
+                            Address: {resident.address || "No address"}
+                          </Text>
+                          <Text
+                            fontWeight="semibold"
+                            color="gray.700"
+                            fontSize="xs"
+                          >
+                            Joined:{" "}
+                            {resident.createdAt
+                              ? new Date(
+                                  resident.createdAt
+                                ).toLocaleDateString()
+                              : "N/A"}
+                          </Text>
                         </Stack>
 
                         {/* <Button
@@ -1682,7 +1748,6 @@ function DashboardContent() {
                         <Flex justify="space-between" align="start">
                           <Box flex="1">
                             <HStack gap={2} mb={2}>
-                              <Text fontSize="2xl">🏠</Text>
                               <Heading size="md" color="navy.700">
                                 Clubhouse
                               </Heading>
@@ -1734,22 +1799,17 @@ function DashboardContent() {
 
                         {/* Details */}
                         <Stack gap={2} fontSize="sm" color="gray.700">
-                          <HStack gap={2}>
-                            <Text fontWeight="semibold">📅 Date:</Text>
-                            <Text>
-                              {new Date(reservation.date).toLocaleDateString()}
-                            </Text>
-                          </HStack>
-                          <HStack gap={2}>
-                            <Text fontWeight="semibold">🕐 Time:</Text>
-                            <Text>
-                              {reservation.startTime} - {reservation.endTime}
-                            </Text>
-                          </HStack>
-                          <HStack gap={2}>
-                            <Text fontWeight="semibold">📝 Purpose:</Text>
-                            <Text>{reservation.purpose}</Text>
-                          </HStack>
+                          <Text fontWeight="semibold">
+                            Date:{" "}
+                            {new Date(reservation.date).toLocaleDateString()}
+                          </Text>
+                          <Text fontWeight="semibold">
+                            Time: {reservation.startTime} -{" "}
+                            {reservation.endTime}
+                          </Text>
+                          <Text fontWeight="semibold">
+                            Purpose: {reservation.purpose}
+                          </Text>
                         </Stack>
 
                         {/* Reservation Info */}
@@ -1945,7 +2005,8 @@ function DashboardContent() {
                           {announcement.content}
                         </Text>
                         <Text fontSize="xs" color="gray.500">
-                          📅 {new Date(announcement.date).toLocaleDateString()}
+                          Posted:{" "}
+                          {new Date(announcement.date).toLocaleDateString()}
                         </Text>
                         <HStack gap={2} mt={2}>
                           <IconButton
@@ -1964,7 +2025,7 @@ function DashboardContent() {
                               setIsAnnouncementModalOpen(true);
                             }}
                           >
-                            ✏️
+                            Edit
                           </IconButton>
                           <IconButton
                             aria-label={
@@ -1986,7 +2047,9 @@ function DashboardContent() {
                               )
                             }
                           >
-                            {announcement.status === "active" ? "🔕" : "🔔"}
+                            {announcement.status === "active"
+                              ? "Deactivate"
+                              : "Activate"}
                           </IconButton>
                         </HStack>
                       </Stack>
@@ -2049,7 +2112,7 @@ function DashboardContent() {
                     _hover={{ bg: "blue.50" }}
                     onClick={() => handleEditEvent(selectedEventForAttendees)}
                   >
-                    ✏️ Edit Event
+                    Edit Event
                   </Button>
                   <Button
                     size="sm"
@@ -2067,7 +2130,7 @@ function DashboardContent() {
                       }
                     }}
                   >
-                    🗑️ Delete Event
+                    Delete Event
                   </Button>
                   <Button
                     size="sm"
@@ -2077,7 +2140,7 @@ function DashboardContent() {
                     _hover={{ bg: "navy.50" }}
                     onClick={downloadAttendeesList}
                   >
-                    📥 Download CSV
+                    Download CSV
                   </Button>
                   <Button
                     size="sm"
@@ -2086,7 +2149,7 @@ function DashboardContent() {
                     _hover={{ bg: "navy.700" }}
                     onClick={printAttendeesList}
                   >
-                    🖨️ Print List
+                    Print List
                   </Button>
                 </HStack>
               </Flex>
@@ -2103,7 +2166,7 @@ function DashboardContent() {
                 <SimpleGrid columns={{ base: 1, md: 2, lg: 5 }} gap={6}>
                   <Box>
                     <Text fontSize="sm" color="gray.600" mb={1}>
-                      📅 Date
+                      Date
                     </Text>
                     <Text fontWeight="bold" color="navy.700">
                       {selectedEventForAttendees.date}
@@ -2111,7 +2174,7 @@ function DashboardContent() {
                   </Box>
                   <Box>
                     <Text fontSize="sm" color="gray.600" mb={1}>
-                      🕐 Time
+                      Time
                     </Text>
                     <Text fontWeight="bold" color="navy.700">
                       {selectedEventForAttendees.time}
@@ -2119,7 +2182,7 @@ function DashboardContent() {
                   </Box>
                   <Box>
                     <Text fontSize="sm" color="gray.600" mb={1}>
-                      📍 Location
+                      Location
                     </Text>
                     <Text fontWeight="bold" color="navy.700">
                       {selectedEventForAttendees.location}
@@ -2127,7 +2190,7 @@ function DashboardContent() {
                   </Box>
                   <Box>
                     <Text fontSize="sm" color="gray.600" mb={1}>
-                      💰 Price
+                      Price
                     </Text>
                     <Text fontWeight="bold" color="navy.700">
                       {selectedEventForAttendees.isFree
@@ -2137,7 +2200,7 @@ function DashboardContent() {
                   </Box>
                   <Box>
                     <Text fontSize="sm" color="gray.600" mb={1}>
-                      🎫 Available Tickets
+                      Available Tickets
                     </Text>
                     <Text
                       fontWeight="bold"
@@ -2275,9 +2338,11 @@ function DashboardContent() {
                                 alignItems="center"
                                 justifyContent="center"
                                 fontSize="xl"
+                                fontWeight="bold"
+                                color="navy.700"
                                 flexShrink={0}
                               >
-                                👤
+                                U
                               </Box>
                               <Box flex="1">
                                 <Text
