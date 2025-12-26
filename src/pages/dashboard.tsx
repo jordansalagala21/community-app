@@ -65,6 +65,15 @@ function DashboardContent() {
   const [isAnnouncementModalOpen, setIsAnnouncementModalOpen] = useState(false);
   const [editingAnnouncement, setEditingAnnouncement] =
     useState<AnnouncementItem | null>(null);
+  const [bookings, setBookings] = useState<any[]>([]);
+  const [selectedEventForAttendees, setSelectedEventForAttendees] =
+    useState<EventItem | null>(null);
+  const [editingAttendee, setEditingAttendee] = useState<any | null>(null);
+  const [isEditAttendeeModalOpen, setIsEditAttendeeModalOpen] = useState(false);
+  const [attendeeForm, setAttendeeForm] = useState({
+    ticketCount: 0,
+    paymentMethod: "cash",
+  });
   const [announcementForm, setAnnouncementForm] = useState({
     title: "",
     content: "",
@@ -87,11 +96,12 @@ function DashboardContent() {
     window.location.href = "/";
   };
 
-  // Load events, residents, and announcements from Firestore
+  // Load events, residents, announcements, and bookings from Firestore
   useEffect(() => {
     loadEvents();
     loadResidents();
     loadAnnouncements();
+    loadBookings();
   }, []);
 
   const loadResidents = async () => {
@@ -135,6 +145,237 @@ function DashboardContent() {
     } catch (error) {
       console.error("Error loading announcements:", error);
     }
+  };
+
+  const loadBookings = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, "bookings"));
+      const loadedBookings: any[] = [];
+      querySnapshot.forEach((doc) => {
+        loadedBookings.push({ id: doc.id, ...doc.data() });
+      });
+      setBookings(loadedBookings);
+    } catch (error) {
+      console.error("Error loading bookings:", error);
+    }
+  };
+
+  const viewEventAttendees = (event: EventItem) => {
+    setSelectedEventForAttendees(event);
+    setActiveTab("event-detail");
+  };
+
+  const getEventAttendees = (eventId: string) => {
+    return bookings.filter((booking) => booking.eventId === eventId);
+  };
+
+  const downloadAttendeesList = () => {
+    if (!selectedEventForAttendees) return;
+
+    const attendees = getEventAttendees(selectedEventForAttendees.id);
+    const csvContent = [
+      [
+        "Name",
+        "Email",
+        "Tickets",
+        "Payment Method",
+        "Total",
+        "Booking Date",
+      ].join(","),
+      ...attendees.map((booking) =>
+        [
+          booking.userName,
+          booking.userEmail,
+          booking.ticketCount,
+          booking.paymentMethod || "Cash",
+          `$${booking.totalAmount}`,
+          new Date(booking.bookedAt).toLocaleDateString(),
+        ].join(",")
+      ),
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${selectedEventForAttendees.title.replace(
+      /\s+/g,
+      "_"
+    )}_attendees.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const deleteAttendee = async (booking: any) => {
+    if (
+      !confirm(`Are you sure you want to remove ${booking.userName}'s booking?`)
+    ) {
+      return;
+    }
+
+    try {
+      // Delete the booking
+      await deleteDoc(doc(db, "bookings", booking.id));
+
+      // Update available tickets
+      if (selectedEventForAttendees) {
+        const eventRef = doc(db, "events", selectedEventForAttendees.id);
+        await updateDoc(eventRef, {
+          availableTickets:
+            selectedEventForAttendees.availableTickets + booking.ticketCount,
+        });
+      }
+
+      // Reload data
+      await loadBookings();
+      await loadEvents();
+
+      alert("Booking removed successfully!");
+    } catch (error) {
+      console.error("Error deleting booking:", error);
+      alert("Failed to delete booking. Please try again.");
+    }
+  };
+
+  const openEditAttendeeModal = (booking: any) => {
+    setEditingAttendee(booking);
+    setAttendeeForm({
+      ticketCount: booking.ticketCount,
+      paymentMethod: booking.paymentMethod || "cash",
+    });
+    setIsEditAttendeeModalOpen(true);
+  };
+
+  const handleSaveAttendee = async () => {
+    if (!editingAttendee || !selectedEventForAttendees) return;
+
+    try {
+      setLoading(true);
+
+      const ticketDifference =
+        attendeeForm.ticketCount - editingAttendee.ticketCount;
+      const newTotalAmount = selectedEventForAttendees.isFree
+        ? 0
+        : selectedEventForAttendees.price * attendeeForm.ticketCount;
+
+      // Update booking
+      await updateDoc(doc(db, "bookings", editingAttendee.id), {
+        ticketCount: attendeeForm.ticketCount,
+        paymentMethod: attendeeForm.paymentMethod,
+        totalAmount: newTotalAmount,
+      });
+
+      // Update available tickets if ticket count changed
+      if (ticketDifference !== 0) {
+        const eventRef = doc(db, "events", selectedEventForAttendees.id);
+        await updateDoc(eventRef, {
+          availableTickets:
+            selectedEventForAttendees.availableTickets - ticketDifference,
+        });
+      }
+
+      // Reload data
+      await loadBookings();
+      await loadEvents();
+
+      setIsEditAttendeeModalOpen(false);
+      setEditingAttendee(null);
+      alert("Booking updated successfully!");
+    } catch (error) {
+      console.error("Error updating booking:", error);
+      alert("Failed to update booking. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const printAttendeesList = () => {
+    if (!selectedEventForAttendees) return;
+
+    const attendees = getEventAttendees(selectedEventForAttendees.id);
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+
+    const totalTickets = attendees.reduce(
+      (sum, booking) => sum + booking.ticketCount,
+      0
+    );
+    const totalRevenue = attendees.reduce(
+      (sum, booking) => sum + booking.totalAmount,
+      0
+    );
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${selectedEventForAttendees.title} - Attendees List</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            h1 { color: #1a365d; }
+            .header { margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #1a365d; }
+            .summary { background: #f7fafc; padding: 15px; margin-bottom: 20px; border-radius: 8px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+            th { background-color: #1a365d; color: white; }
+            tr:hover { background-color: #f7fafc; }
+            .footer { margin-top: 30px; padding-top: 10px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #718096; }
+            @media print { button { display: none; } }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>${selectedEventForAttendees.title}</h1>
+            <p><strong>Date:</strong> ${selectedEventForAttendees.date} at ${
+      selectedEventForAttendees.time
+    }</p>
+            <p><strong>Location:</strong> ${
+              selectedEventForAttendees.location
+            }</p>
+          </div>
+          <div class="summary">
+            <p><strong>Total Attendees:</strong> ${attendees.length}</p>
+            <p><strong>Total Tickets Booked:</strong> ${totalTickets}</p>
+            <p><strong>Total Revenue:</strong> $${totalRevenue}</p>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Tickets</th>
+                <th>Payment</th>
+                <th>Amount</th>
+                <th>Booking Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${attendees
+                .map(
+                  (booking) => `
+                <tr>
+                  <td>${booking.userName}</td>
+                  <td>${booking.userEmail}</td>
+                  <td>${booking.ticketCount}</td>
+                  <td>${booking.paymentMethod || "Cash"}</td>
+                  <td>$${booking.totalAmount}</td>
+                  <td>${new Date(booking.bookedAt).toLocaleDateString()}</td>
+                </tr>
+              `
+                )
+                .join("")}
+            </tbody>
+          </table>
+          <div class="footer">
+            <p>Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</p>
+          </div>
+          <script>
+            window.onload = function() { window.print(); }
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   const openNewAnnouncementModal = () => {
@@ -692,9 +933,12 @@ function DashboardContent() {
                     shadow="md"
                     p={5}
                     transition="all 0.2s"
+                    cursor="pointer"
+                    onClick={() => viewEventAttendees(event)}
                     _hover={{
                       shadow: "lg",
                       borderColor: "navy.400",
+                      transform: "translateY(-2px)",
                     }}
                   >
                     <Stack gap={3}>
@@ -767,9 +1011,25 @@ function DashboardContent() {
                           color="navy.600"
                           flex="1"
                           _hover={{ bg: "navy.50" }}
-                          onClick={() => handleEditEvent(event)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditEvent(event);
+                          }}
                         >
                           Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          bg="green.500"
+                          color="white"
+                          flex="1"
+                          _hover={{ bg: "green.600" }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            viewEventAttendees(event);
+                          }}
+                        >
+                          Attendees ({getEventAttendees(event.id).length})
                         </Button>
                         <Button
                           size="sm"
@@ -777,7 +1037,10 @@ function DashboardContent() {
                           color="white"
                           flex="1"
                           _hover={{ bg: "red.600" }}
-                          onClick={() => handleDeleteEvent(event.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteEvent(event.id);
+                          }}
                         >
                           Delete
                         </Button>
@@ -1102,6 +1365,384 @@ function DashboardContent() {
               </Box>
             </Stack>
           )}
+
+          {activeTab === "event-detail" && selectedEventForAttendees && (
+            <Stack gap={6}>
+              <Flex
+                justify="space-between"
+                align="center"
+                flexWrap="wrap"
+                gap={4}
+              >
+                <HStack gap={3}>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setActiveTab("events");
+                      setSelectedEventForAttendees(null);
+                    }}
+                  >
+                    ← Back to Events
+                  </Button>
+                  <Heading size="lg" color="navy.700">
+                    {selectedEventForAttendees.title}
+                  </Heading>
+                </HStack>
+                <HStack gap={2}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    borderColor="blue.600"
+                    color="blue.600"
+                    _hover={{ bg: "blue.50" }}
+                    onClick={() => handleEditEvent(selectedEventForAttendees)}
+                  >
+                    ✏️ Edit Event
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    borderColor="red.600"
+                    color="red.600"
+                    _hover={{ bg: "red.50" }}
+                    onClick={() => {
+                      if (
+                        confirm("Are you sure you want to delete this event?")
+                      ) {
+                        handleDeleteEvent(selectedEventForAttendees.id);
+                        setActiveTab("events");
+                        setSelectedEventForAttendees(null);
+                      }
+                    }}
+                  >
+                    🗑️ Delete Event
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    borderColor="navy.600"
+                    color="navy.600"
+                    _hover={{ bg: "navy.50" }}
+                    onClick={downloadAttendeesList}
+                  >
+                    📥 Download CSV
+                  </Button>
+                  <Button
+                    size="sm"
+                    bg="navy.600"
+                    color="white"
+                    _hover={{ bg: "navy.700" }}
+                    onClick={printAttendeesList}
+                  >
+                    🖨️ Print List
+                  </Button>
+                </HStack>
+              </Flex>
+
+              {/* Event Info Card */}
+              <Box
+                bg="white"
+                p={6}
+                rounded="xl"
+                shadow="md"
+                borderWidth="1px"
+                borderColor="gray.200"
+              >
+                <SimpleGrid columns={{ base: 1, md: 2, lg: 5 }} gap={6}>
+                  <Box>
+                    <Text fontSize="sm" color="gray.600" mb={1}>
+                      📅 Date
+                    </Text>
+                    <Text fontWeight="bold" color="navy.700">
+                      {selectedEventForAttendees.date}
+                    </Text>
+                  </Box>
+                  <Box>
+                    <Text fontSize="sm" color="gray.600" mb={1}>
+                      🕐 Time
+                    </Text>
+                    <Text fontWeight="bold" color="navy.700">
+                      {selectedEventForAttendees.time}
+                    </Text>
+                  </Box>
+                  <Box>
+                    <Text fontSize="sm" color="gray.600" mb={1}>
+                      📍 Location
+                    </Text>
+                    <Text fontWeight="bold" color="navy.700">
+                      {selectedEventForAttendees.location}
+                    </Text>
+                  </Box>
+                  <Box>
+                    <Text fontSize="sm" color="gray.600" mb={1}>
+                      💰 Price
+                    </Text>
+                    <Text fontWeight="bold" color="navy.700">
+                      {selectedEventForAttendees.isFree
+                        ? "Free"
+                        : `$${selectedEventForAttendees.price}`}
+                    </Text>
+                  </Box>
+                  <Box>
+                    <Text fontSize="sm" color="gray.600" mb={1}>
+                      🎫 Available Tickets
+                    </Text>
+                    <Text
+                      fontWeight="bold"
+                      color={
+                        selectedEventForAttendees.availableTickets === 0
+                          ? "red.600"
+                          : selectedEventForAttendees.availableTickets < 10
+                          ? "orange.600"
+                          : "green.600"
+                      }
+                    >
+                      {selectedEventForAttendees.availableTickets} left
+                    </Text>
+                  </Box>
+                </SimpleGrid>
+                <Box mt={4}>
+                  <Text fontSize="sm" color="gray.600" mb={1}>
+                    Description
+                  </Text>
+                  <Text color="gray.700">
+                    {selectedEventForAttendees.description}
+                  </Text>
+                </Box>
+              </Box>
+
+              {/* Attendees Stats */}
+              <SimpleGrid columns={{ base: 1, md: 3 }} gap={6}>
+                <Box
+                  bg="gradient-to-br"
+                  bgGradient="linear(to-br, blue.50, blue.100)"
+                  p={6}
+                  rounded="xl"
+                  borderWidth="1px"
+                  borderColor="blue.200"
+                >
+                  <Text fontSize="sm" color="blue.700" mb={1}>
+                    Total Bookings
+                  </Text>
+                  <Text fontSize="3xl" fontWeight="bold" color="blue.700">
+                    {getEventAttendees(selectedEventForAttendees.id).length}
+                  </Text>
+                </Box>
+                <Box
+                  bg="gradient-to-br"
+                  bgGradient="linear(to-br, green.50, green.100)"
+                  p={6}
+                  rounded="xl"
+                  borderWidth="1px"
+                  borderColor="green.200"
+                >
+                  <Text fontSize="sm" color="green.700" mb={1}>
+                    Total Tickets Sold
+                  </Text>
+                  <Text fontSize="3xl" fontWeight="bold" color="green.700">
+                    {getEventAttendees(selectedEventForAttendees.id).reduce(
+                      (sum, booking) => sum + booking.ticketCount,
+                      0
+                    )}
+                  </Text>
+                </Box>
+                <Box
+                  bg="gradient-to-br"
+                  bgGradient="linear(to-br, purple.50, purple.100)"
+                  p={6}
+                  rounded="xl"
+                  borderWidth="1px"
+                  borderColor="purple.200"
+                >
+                  <Text fontSize="sm" color="purple.700" mb={1}>
+                    Total Revenue
+                  </Text>
+                  <Text fontSize="3xl" fontWeight="bold" color="purple.700">
+                    $
+                    {getEventAttendees(selectedEventForAttendees.id).reduce(
+                      (sum, booking) => sum + booking.totalAmount,
+                      0
+                    )}
+                  </Text>
+                </Box>
+              </SimpleGrid>
+
+              {/* Attendees List */}
+              <Box
+                bg="white"
+                rounded="xl"
+                shadow="md"
+                borderWidth="1px"
+                borderColor="gray.200"
+              >
+                <Box p={6} borderBottomWidth="1px" borderBottomColor="gray.200">
+                  <Heading size="md" color="navy.700">
+                    Attendees List
+                  </Heading>
+                </Box>
+
+                {getEventAttendees(selectedEventForAttendees.id).length ===
+                0 ? (
+                  <Box p={8} textAlign="center">
+                    <Text color="gray.600" fontSize="lg">
+                      No bookings yet for this event.
+                    </Text>
+                  </Box>
+                ) : (
+                  <Stack gap={0}>
+                    {getEventAttendees(selectedEventForAttendees.id).map(
+                      (booking, index) => (
+                        <Box
+                          key={booking.id}
+                          p={6}
+                          borderBottomWidth={
+                            index <
+                            getEventAttendees(selectedEventForAttendees.id)
+                              .length -
+                              1
+                              ? "1px"
+                              : "0"
+                          }
+                          borderBottomColor="gray.100"
+                          _hover={{ bg: "gray.50" }}
+                          transition="all 0.2s"
+                        >
+                          <Flex
+                            direction={{ base: "column", md: "row" }}
+                            justify="space-between"
+                            align={{ base: "start", md: "center" }}
+                            gap={4}
+                          >
+                            <Flex align="center" gap={4} flex="1">
+                              <Box
+                                w="50px"
+                                h="50px"
+                                bg="navy.100"
+                                rounded="full"
+                                display="flex"
+                                alignItems="center"
+                                justifyContent="center"
+                                fontSize="xl"
+                                flexShrink={0}
+                              >
+                                👤
+                              </Box>
+                              <Box flex="1">
+                                <Text
+                                  fontWeight="bold"
+                                  color="navy.700"
+                                  fontSize="lg"
+                                >
+                                  {booking.userName}
+                                </Text>
+                                <Text fontSize="sm" color="gray.600">
+                                  {booking.userEmail}
+                                </Text>
+                                <Text fontSize="xs" color="gray.500" mt={1}>
+                                  Booked on{" "}
+                                  {new Date(
+                                    booking.bookedAt
+                                  ).toLocaleDateString()}{" "}
+                                  at{" "}
+                                  {new Date(
+                                    booking.bookedAt
+                                  ).toLocaleTimeString()}
+                                </Text>
+                              </Box>
+                            </Flex>
+
+                            <Box>
+                              <SimpleGrid
+                                columns={{ base: 2, sm: 4 }}
+                                gap={4}
+                                minW={{ md: "400px" }}
+                              >
+                                <Box textAlign="center">
+                                  <Text fontSize="xs" color="gray.600" mb={1}>
+                                    Tickets
+                                  </Text>
+                                  <Text
+                                    fontWeight="bold"
+                                    color="navy.700"
+                                    fontSize="lg"
+                                  >
+                                    {booking.ticketCount}
+                                  </Text>
+                                </Box>
+                                <Box textAlign="center">
+                                  <Text fontSize="xs" color="gray.600" mb={1}>
+                                    Payment
+                                  </Text>
+                                  <Text
+                                    fontWeight="bold"
+                                    color="green.600"
+                                    fontSize="sm"
+                                    textTransform="uppercase"
+                                  >
+                                    {booking.paymentMethod || "Cash"}
+                                  </Text>
+                                </Box>
+                                <Box textAlign="center">
+                                  <Text fontSize="xs" color="gray.600" mb={1}>
+                                    Amount
+                                  </Text>
+                                  <Text
+                                    fontWeight="bold"
+                                    color="navy.700"
+                                    fontSize="lg"
+                                  >
+                                    ${booking.totalAmount}
+                                  </Text>
+                                </Box>
+                                <Box textAlign="center">
+                                  <Text fontSize="xs" color="gray.600" mb={1}>
+                                    Status
+                                  </Text>
+                                  <Box
+                                    as="span"
+                                    px={2}
+                                    py={1}
+                                    bg="green.100"
+                                    color="green.700"
+                                    rounded="full"
+                                    fontSize="xs"
+                                    fontWeight="bold"
+                                  >
+                                    {booking.status || "Confirmed"}
+                                  </Box>
+                                </Box>
+                              </SimpleGrid>
+                              <HStack gap={2} mt={3} justify="flex-end">
+                                <Button
+                                  size="sm"
+                                  bg="blue.500"
+                                  color="white"
+                                  _hover={{ bg: "blue.600" }}
+                                  onClick={() => openEditAttendeeModal(booking)}
+                                >
+                                  Edit
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  bg="red.500"
+                                  color="white"
+                                  _hover={{ bg: "red.600" }}
+                                  onClick={() => deleteAttendee(booking)}
+                                >
+                                  Delete
+                                </Button>
+                              </HStack>
+                            </Box>
+                          </Flex>
+                        </Box>
+                      )
+                    )}
+                  </Stack>
+                )}
+              </Box>
+            </Stack>
+          )}
         </Box>
       </Box>
 
@@ -1421,6 +2062,176 @@ function DashboardContent() {
                   {editingAnnouncement
                     ? "Update Announcement"
                     : "Create Announcement"}
+                </Button>
+              </HStack>
+            </Dialog.Footer>
+          </Dialog.Content>
+        </Dialog.Positioner>
+      </Dialog.Root>
+
+      {/* Edit Attendee Modal */}
+      <Dialog.Root
+        open={isEditAttendeeModalOpen}
+        onOpenChange={(e) => setIsEditAttendeeModalOpen(e.open)}
+        size="md"
+      >
+        <Dialog.Backdrop />
+        <Dialog.Positioner>
+          <Dialog.Content>
+            <Dialog.Header>
+              <Dialog.Title>Edit Booking</Dialog.Title>
+              <Dialog.CloseTrigger />
+            </Dialog.Header>
+            <Dialog.Body>
+              {editingAttendee && (
+                <Stack gap={4}>
+                  <Box
+                    p={4}
+                    bg="gray.50"
+                    rounded="md"
+                    borderWidth="1px"
+                    borderColor="gray.200"
+                  >
+                    <Text fontWeight="bold" color="navy.700" mb={1}>
+                      {editingAttendee.userName}
+                    </Text>
+                    <Text fontSize="sm" color="gray.600">
+                      {editingAttendee.userEmail}
+                    </Text>
+                  </Box>
+
+                  <Box>
+                    <Text mb={2} fontWeight="medium">
+                      Ticket Count *
+                    </Text>
+                    <Input
+                      type="number"
+                      min="1"
+                      value={attendeeForm.ticketCount}
+                      onChange={(e) =>
+                        setAttendeeForm({
+                          ...attendeeForm,
+                          ticketCount: parseInt(e.target.value) || 1,
+                        })
+                      }
+                    />
+                  </Box>
+
+                  <Box>
+                    <Text mb={2} fontWeight="medium">
+                      Payment Method *
+                    </Text>
+                    <HStack gap={2}>
+                      <Button
+                        flex="1"
+                        variant={
+                          attendeeForm.paymentMethod === "cash"
+                            ? "solid"
+                            : "outline"
+                        }
+                        bg={
+                          attendeeForm.paymentMethod === "cash"
+                            ? "navy.600"
+                            : "white"
+                        }
+                        color={
+                          attendeeForm.paymentMethod === "cash"
+                            ? "white"
+                            : "navy.600"
+                        }
+                        borderColor="navy.600"
+                        _hover={{
+                          bg:
+                            attendeeForm.paymentMethod === "cash"
+                              ? "navy.700"
+                              : "gray.50",
+                        }}
+                        onClick={() =>
+                          setAttendeeForm({
+                            ...attendeeForm,
+                            paymentMethod: "cash",
+                          })
+                        }
+                      >
+                        Cash
+                      </Button>
+                      <Button
+                        flex="1"
+                        variant={
+                          attendeeForm.paymentMethod === "zelle"
+                            ? "solid"
+                            : "outline"
+                        }
+                        bg={
+                          attendeeForm.paymentMethod === "zelle"
+                            ? "navy.600"
+                            : "white"
+                        }
+                        color={
+                          attendeeForm.paymentMethod === "zelle"
+                            ? "white"
+                            : "navy.600"
+                        }
+                        borderColor="navy.600"
+                        _hover={{
+                          bg:
+                            attendeeForm.paymentMethod === "zelle"
+                              ? "navy.700"
+                              : "gray.50",
+                        }}
+                        onClick={() =>
+                          setAttendeeForm({
+                            ...attendeeForm,
+                            paymentMethod: "zelle",
+                          })
+                        }
+                      >
+                        Zelle
+                      </Button>
+                    </HStack>
+                  </Box>
+
+                  {selectedEventForAttendees &&
+                    !selectedEventForAttendees.isFree && (
+                      <Box
+                        p={3}
+                        bg="blue.50"
+                        rounded="md"
+                        borderWidth="1px"
+                        borderColor="blue.200"
+                      >
+                        <Text fontSize="sm" color="gray.700">
+                          New Total Amount:
+                        </Text>
+                        <Text fontSize="2xl" fontWeight="bold" color="navy.700">
+                          $
+                          {selectedEventForAttendees.price *
+                            attendeeForm.ticketCount}
+                        </Text>
+                      </Box>
+                    )}
+                </Stack>
+              )}
+            </Dialog.Body>
+            <Dialog.Footer>
+              <HStack gap={3}>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsEditAttendeeModalOpen(false);
+                    setEditingAttendee(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  bg="navy.600"
+                  color="white"
+                  _hover={{ bg: "navy.700" }}
+                  onClick={handleSaveAttendee}
+                  loading={loading}
+                >
+                  Save Changes
                 </Button>
               </HStack>
             </Dialog.Footer>

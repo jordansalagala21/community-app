@@ -11,10 +11,19 @@ import {
   Text,
   Input,
   Dialog,
+  RadioGroup,
 } from "@chakra-ui/react";
 import { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
-import { collection, getDocs, updateDoc, doc } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  updateDoc,
+  doc,
+  addDoc,
+  query,
+  where,
+} from "firebase/firestore";
 import { db } from "../lib/firebase";
 
 type EventItem = {
@@ -40,18 +49,92 @@ type AnnouncementItem = {
   createdAt?: any;
 };
 
-const EventCard = ({ event }: { event: EventItem }) => {
+const EventCard = ({ event, user }: { event: EventItem; user: any }) => {
   const [ticketCount, setTicketCount] = useState(1);
   const [isBooking, setIsBooking] = useState(false);
+  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [bookingDetails, setBookingDetails] = useState<any>(null);
+  const [hasBooked, setHasBooked] = useState(false);
+  const [checkingBooking, setCheckingBooking] = useState(true);
 
-  const handleBooking = () => {
-    setIsBooking(true);
-    // Simulate booking
-    setTimeout(() => {
-      alert(`Successfully booked ${ticketCount} ticket(s) for ${event.title}!`);
-      setIsBooking(false);
+  // Check if user has already booked this event
+  useEffect(() => {
+    const checkExistingBooking = async () => {
+      if (!user?.uid) {
+        setCheckingBooking(false);
+        return;
+      }
+
+      try {
+        const bookingsQuery = query(
+          collection(db, "bookings"),
+          where("eventId", "==", event.id),
+          where("userId", "==", user.uid)
+        );
+        const querySnapshot = await getDocs(bookingsQuery);
+        setHasBooked(!querySnapshot.empty);
+      } catch (error) {
+        console.error("Error checking booking:", error);
+      } finally {
+        setCheckingBooking(false);
+      }
+    };
+
+    checkExistingBooking();
+  }, [event.id, user?.uid]);
+
+  const handleOpenBookingModal = () => {
+    setIsBookingModalOpen(true);
+  };
+
+  const handleBooking = async () => {
+    try {
+      setIsBooking(true);
+
+      // Create booking record
+      await addDoc(collection(db, "bookings"), {
+        eventId: event.id,
+        eventTitle: event.title,
+        eventDate: event.date,
+        eventTime: event.time,
+        userId: user?.uid,
+        userEmail: user?.email,
+        userName: user?.displayName || user?.email?.split("@")[0] || "Guest",
+        ticketCount: ticketCount,
+        paymentMethod: paymentMethod,
+        totalAmount: event.isFree ? 0 : event.price * ticketCount,
+        status: "confirmed",
+        bookedAt: new Date().toISOString(),
+      });
+
+      // Update available tickets
+      const eventRef = doc(db, "events", event.id);
+      await updateDoc(eventRef, {
+        availableTickets: event.availableTickets - ticketCount,
+      });
+
+      // Store booking details for success modal
+      setBookingDetails({
+        ticketCount,
+        eventTitle: event.title,
+        eventDate: event.date,
+        eventTime: event.time,
+        paymentMethod,
+        totalAmount: event.isFree ? 0 : event.price * ticketCount,
+      });
+
+      setIsBookingModalOpen(false);
+      setIsSuccessModalOpen(true);
       setTicketCount(1);
-    }, 1000);
+      setPaymentMethod("cash");
+    } catch (error) {
+      console.error("Booking error:", error);
+      alert("Failed to complete booking. Please try again.");
+    } finally {
+      setIsBooking(false);
+    }
   };
 
   return (
@@ -193,9 +276,10 @@ const EventCard = ({ event }: { event: EventItem }) => {
           </Flex>
 
           <Button
-            onClick={handleBooking}
-            disabled={isBooking || event.availableTickets === 0}
-            loading={isBooking}
+            onClick={handleOpenBookingModal}
+            disabled={
+              event.availableTickets === 0 || hasBooked || checkingBooking
+            }
             bg="navy.500"
             color="white"
             size="lg"
@@ -208,7 +292,11 @@ const EventCard = ({ event }: { event: EventItem }) => {
               cursor: "not-allowed",
             }}
           >
-            {event.availableTickets === 0
+            {checkingBooking
+              ? "Checking..."
+              : hasBooked
+              ? "✓ Already Booked"
+              : event.availableTickets === 0
               ? "Sold Out"
               : event.isFree
               ? "Reserve Tickets"
@@ -216,6 +304,298 @@ const EventCard = ({ event }: { event: EventItem }) => {
           </Button>
         </Stack>
       </Stack>
+
+      {/* Booking Modal */}
+      <Dialog.Root
+        open={isBookingModalOpen}
+        onOpenChange={(e) => setIsBookingModalOpen(e.open)}
+      >
+        <Dialog.Backdrop />
+        <Dialog.Positioner>
+          <Dialog.Content>
+            <Dialog.Header>
+              <Dialog.Title>Complete Booking</Dialog.Title>
+              <Dialog.CloseTrigger />
+            </Dialog.Header>
+            <Dialog.Body>
+              <Stack gap={4}>
+                <Box>
+                  <Text fontWeight="bold" fontSize="lg" color="navy.700">
+                    {event.title}
+                  </Text>
+                  <Text fontSize="sm" color="gray.600">
+                    {event.date} at {event.time}
+                  </Text>
+                  <Text fontSize="sm" color="gray.600">
+                    📍 {event.location}
+                  </Text>
+                </Box>
+
+                <Box
+                  p={3}
+                  bg="gray.50"
+                  rounded="lg"
+                  borderWidth="1px"
+                  borderColor="gray.200"
+                >
+                  <Flex justify="space-between" mb={2}>
+                    <Text fontSize="sm">Tickets:</Text>
+                    <Text fontSize="sm" fontWeight="bold">
+                      {ticketCount} × ${event.isFree ? 0 : event.price}
+                    </Text>
+                  </Flex>
+                  <Flex justify="space-between">
+                    <Text fontWeight="bold">Total:</Text>
+                    <Text fontWeight="bold" color="navy.600" fontSize="lg">
+                      ${event.isFree ? 0 : event.price * ticketCount}
+                    </Text>
+                  </Flex>
+                </Box>
+
+                {!event.isFree && (
+                  <Box>
+                    <Text fontWeight="medium" mb={2}>
+                      Payment Method *
+                    </Text>
+                    <RadioGroup.Root
+                      value={paymentMethod}
+                      onValueChange={(details: any) =>
+                        setPaymentMethod(details.value)
+                      }
+                    >
+                      <Stack gap={3}>
+                        <RadioGroup.Item value="cash">
+                          <RadioGroup.ItemControl />
+                          <RadioGroup.ItemText>
+                            <HStack gap={2}>
+                              <Text fontSize="md">💵</Text>
+                              <Box>
+                                <Text fontSize="sm" fontWeight="medium">
+                                  Cash (Pay at entrance)
+                                </Text>
+                              </Box>
+                            </HStack>
+                          </RadioGroup.ItemText>
+                          <RadioGroup.ItemHiddenInput />
+                        </RadioGroup.Item>
+                        <RadioGroup.Item value="zelle">
+                          <RadioGroup.ItemControl />
+                          <RadioGroup.ItemText>
+                            <HStack gap={2}>
+                              <Text fontSize="md">📱</Text>
+                              <Box>
+                                <Text fontSize="sm" fontWeight="medium">
+                                  Zelle
+                                </Text>
+                              </Box>
+                            </HStack>
+                          </RadioGroup.ItemText>
+                          <RadioGroup.ItemHiddenInput />
+                        </RadioGroup.Item>
+                      </Stack>
+                    </RadioGroup.Root>
+                  </Box>
+                )}
+
+                <Box
+                  p={4}
+                  bg="blue.50"
+                  borderWidth="1px"
+                  borderColor="blue.200"
+                  rounded="lg"
+                >
+                  <Text fontSize="sm" fontWeight="bold" color="blue.700" mb={1}>
+                    📸 Important Notice
+                  </Text>
+                  <Text fontSize="sm" color="gray.700">
+                    Please keep a screenshot of your payment confirmation to
+                    show at the event entrance.
+                  </Text>
+                </Box>
+              </Stack>
+            </Dialog.Body>
+            <Dialog.Footer>
+              <HStack gap={3}>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsBookingModalOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  bg="navy.600"
+                  color="white"
+                  _hover={{ bg: "navy.700" }}
+                  onClick={handleBooking}
+                  loading={isBooking}
+                >
+                  Confirm Booking
+                </Button>
+              </HStack>
+            </Dialog.Footer>
+          </Dialog.Content>
+        </Dialog.Positioner>
+      </Dialog.Root>
+
+      {/* Booking Success Modal */}
+      <Dialog.Root
+        open={isSuccessModalOpen}
+        onOpenChange={(e) => {
+          if (!e.open) {
+            setIsSuccessModalOpen(false);
+            window.location.reload();
+          }
+        }}
+      >
+        <Dialog.Backdrop />
+        <Dialog.Positioner>
+          <Dialog.Content maxW="500px">
+            <Dialog.Body>
+              <Stack gap={5} py={4}>
+                {/* Success Icon */}
+                <Box textAlign="center">
+                  <Box
+                    display="inline-flex"
+                    alignItems="center"
+                    justifyContent="center"
+                    w="80px"
+                    h="80px"
+                    bg="green.100"
+                    rounded="full"
+                    mb={4}
+                  >
+                    <Text fontSize="4xl">✅</Text>
+                  </Box>
+                  <Heading size="lg" color="green.700" mb={2}>
+                    Booking Confirmed!
+                  </Heading>
+                  <Text color="gray.600">
+                    Your tickets have been successfully reserved
+                  </Text>
+                </Box>
+
+                {/* Booking Details */}
+                {bookingDetails && (
+                  <Box
+                    bg="gray.50"
+                    p={5}
+                    rounded="xl"
+                    borderWidth="1px"
+                    borderColor="gray.200"
+                  >
+                    <Stack gap={3}>
+                      <Flex justify="space-between" align="start">
+                        <Text fontSize="sm" color="gray.600">
+                          Event
+                        </Text>
+                        <Text
+                          fontSize="sm"
+                          fontWeight="bold"
+                          color="navy.700"
+                          textAlign="right"
+                        >
+                          {bookingDetails.eventTitle}
+                        </Text>
+                      </Flex>
+                      <Flex justify="space-between">
+                        <Text fontSize="sm" color="gray.600">
+                          Date & Time
+                        </Text>
+                        <Text
+                          fontSize="sm"
+                          fontWeight="medium"
+                          color="gray.700"
+                        >
+                          {bookingDetails.eventDate} at{" "}
+                          {bookingDetails.eventTime}
+                        </Text>
+                      </Flex>
+                      <Flex justify="space-between">
+                        <Text fontSize="sm" color="gray.600">
+                          Tickets
+                        </Text>
+                        <Text fontSize="sm" fontWeight="bold" color="gray.700">
+                          {bookingDetails.ticketCount}
+                        </Text>
+                      </Flex>
+                      <Flex justify="space-between">
+                        <Text fontSize="sm" color="gray.600">
+                          Payment Method
+                        </Text>
+                        <Text
+                          fontSize="sm"
+                          fontWeight="bold"
+                          color="green.600"
+                          textTransform="uppercase"
+                        >
+                          {bookingDetails.paymentMethod}
+                        </Text>
+                      </Flex>
+                      <Box
+                        pt={3}
+                        borderTopWidth="1px"
+                        borderTopColor="gray.300"
+                      >
+                        <Flex justify="space-between" align="center">
+                          <Text
+                            fontSize="md"
+                            fontWeight="bold"
+                            color="gray.700"
+                          >
+                            Total Amount
+                          </Text>
+                          <Text
+                            fontSize="xl"
+                            fontWeight="bold"
+                            color="navy.700"
+                          >
+                            ${bookingDetails.totalAmount}
+                          </Text>
+                        </Flex>
+                      </Box>
+                    </Stack>
+                  </Box>
+                )}
+
+                {/* Important Notice */}
+                <Box
+                  bg="blue.50"
+                  p={4}
+                  rounded="lg"
+                  borderWidth="1px"
+                  borderColor="blue.200"
+                >
+                  <HStack gap={2} mb={2}>
+                    <Text fontSize="lg">📸</Text>
+                    <Text fontSize="sm" fontWeight="bold" color="blue.700">
+                      Important Reminder
+                    </Text>
+                  </HStack>
+                  <Text fontSize="sm" color="gray.700">
+                    Please keep a screenshot of your payment confirmation to
+                    show at the event entrance.
+                  </Text>
+                </Box>
+
+                {/* Action Button */}
+                <Button
+                  bg="navy.600"
+                  color="white"
+                  size="lg"
+                  width="full"
+                  _hover={{ bg: "navy.700" }}
+                  onClick={() => {
+                    setIsSuccessModalOpen(false);
+                    window.location.reload();
+                  }}
+                >
+                  Got it, Thanks!
+                </Button>
+              </Stack>
+            </Dialog.Body>
+          </Dialog.Content>
+        </Dialog.Positioner>
+      </Dialog.Root>
     </Box>
   );
 };
@@ -630,7 +1010,7 @@ export default function ResidentPortal() {
               gap={{ base: 4, md: 6, lg: 8 }}
             >
               {filteredEvents.map((event) => (
-                <EventCard key={event.id} event={event} />
+                <EventCard key={event.id} event={event} user={user} />
               ))}
             </SimpleGrid>
 
