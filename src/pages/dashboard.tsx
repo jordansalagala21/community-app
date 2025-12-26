@@ -56,12 +56,14 @@ type EventItem = {
   title: string;
   date: string;
   time: string;
+  startTime?: string;
+  endTime?: string;
   location: string;
   description: string;
   availableTickets: number;
   price: number;
   isFree?: boolean;
-  category: string;
+  category: string[];
 };
 
 type AnnouncementItem = {
@@ -143,7 +145,7 @@ function DashboardContent() {
     description: "",
     availableTickets: 0,
     price: 0,
-    category: "Social",
+    category: ["Social"] as string[],
   });
 
   const handleLogout = async () => {
@@ -905,7 +907,7 @@ Welcome to our community!
         description: "",
         availableTickets: 0,
         price: 0,
-        category: "Social",
+        category: ["Social"],
       });
       setEditingEvent(null);
       setIsEventModalOpen(false);
@@ -954,7 +956,7 @@ Welcome to our community!
       description: "",
       availableTickets: 0,
       price: 0,
-      category: "Social",
+      category: ["Social"],
     });
     setIsEventModalOpen(true);
   };
@@ -1620,12 +1622,36 @@ Welcome to our community!
                         </HStack>
                       </Flex>
 
+                      {/* Display multiple categories */}
+                      {event.category && event.category.length > 0 && (
+                        <HStack gap={2} flexWrap="wrap">
+                          {(Array.isArray(event.category)
+                            ? event.category
+                            : [event.category]
+                          ).map((cat) => (
+                            <Box
+                              key={cat}
+                              px={2}
+                              py={1}
+                              bg="purple.100"
+                              color="purple.700"
+                              rounded="md"
+                              fontSize="xs"
+                              fontWeight="medium"
+                            >
+                              {cat}
+                            </Box>
+                          ))}
+                        </HStack>
+                      )}
+
                       <Stack gap={1} fontSize="sm" color="gray.600">
+                        \n{" "}
                         <Text fontSize="xs" fontWeight="semibold">
                           Date: {event.date}
                         </Text>
                         <Text fontSize="xs" fontWeight="semibold">
-                          Time: {event.time}
+                          Time: {event.startTime} - {event.endTime}
                         </Text>
                         <Text fontSize="xs" fontWeight="semibold">
                           Location: {event.location}
@@ -2762,11 +2788,11 @@ Welcome to our community!
                       Date *
                     </Text>
                     <Input
+                      type="date"
                       value={eventForm.date}
                       onChange={(e) =>
                         setEventForm({ ...eventForm, date: e.target.value })
                       }
-                      placeholder="e.g., Saturday, January 10, 2025"
                     />
                   </Stack>
 
@@ -2775,11 +2801,11 @@ Welcome to our community!
                       Time *
                     </Text>
                     <Input
+                      type="time"
                       value={eventForm.time}
                       onChange={(e) =>
                         setEventForm({ ...eventForm, time: e.target.value })
                       }
-                      placeholder="e.g., 6:00 PM - 9:00 PM"
                     />
                   </Stack>
                 </SimpleGrid>
@@ -2799,28 +2825,58 @@ Welcome to our community!
 
                 <Stack gap={1}>
                   <Text fontSize="sm" fontWeight="semibold">
-                    Category
+                    Categories (Select one or more)
                   </Text>
-                  <select
-                    value={eventForm.category}
-                    onChange={(e) =>
-                      setEventForm({ ...eventForm, category: e.target.value })
-                    }
-                    style={{
-                      padding: "8px",
-                      borderWidth: "1px",
-                      borderColor: "#E2E8F0",
-                      borderRadius: "6px",
-                      backgroundColor: "white",
-                    }}
+                  <Box
+                    borderWidth="1px"
+                    borderColor="gray.200"
+                    rounded="md"
+                    p={3}
                   >
-                    <option value="Social">Social</option>
-                    <option value="Dining">Dining</option>
-                    <option value="Fitness">Fitness</option>
-                    <option value="Entertainment">Entertainment</option>
-                    <option value="Kids">Kids</option>
-                    <option value="Service">Service</option>
-                  </select>
+                    <SimpleGrid columns={2} gap={2}>
+                      {[
+                        "Social",
+                        "Dining",
+                        "Fitness",
+                        "Entertainment",
+                        "Kids",
+                        "Service",
+                      ].map((cat) => (
+                        <label
+                          key={cat}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            cursor: "pointer",
+                            padding: "4px",
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={eventForm.category.includes(cat)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setEventForm({
+                                  ...eventForm,
+                                  category: [...eventForm.category, cat],
+                                });
+                              } else {
+                                setEventForm({
+                                  ...eventForm,
+                                  category: eventForm.category.filter(
+                                    (c) => c !== cat
+                                  ),
+                                });
+                              }
+                            }}
+                            style={{ cursor: "pointer" }}
+                          />
+                          <span style={{ fontSize: "14px" }}>{cat}</span>
+                        </label>
+                      ))}
+                    </SimpleGrid>
+                  </Box>
                 </Stack>
 
                 <Stack gap={1}>
