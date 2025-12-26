@@ -997,107 +997,298 @@ function DashboardContent() {
         <Box p={{ base: 4, md: 6 }}>
           {activeTab === "overview" && (
             <Stack gap={6}>
+              {/* Welcome Banner */}
+              <Box
+                bgGradient="to-r"
+                gradientFrom="navy.600"
+                gradientTo="navy.800"
+                rounded="2xl"
+                shadow="xl"
+                p={{ base: 6, md: 8 }}
+                color="white"
+              >
+                <Heading size={{ base: "lg", md: "xl" }} mb={2}>
+                  Welcome back, Admin! 👋
+                </Heading>
+                <Text fontSize={{ base: "sm", md: "md" }} opacity={0.9}>
+                  Here's what's happening in your community today
+                </Text>
+              </Box>
+
               {/* Stats Grid */}
-              <SimpleGrid columns={{ base: 1, sm: 2, lg: 3 }} gap={4}>
-                {stats.map((stat) => (
+              <SimpleGrid columns={{ base: 1, sm: 2, lg: 3 }} gap={5}>
+                {stats.map((stat, index) => (
                   <Box
                     key={stat.label}
                     bg="white"
-                    p={5}
-                    rounded="xl"
-                    shadow="md"
+                    p={6}
+                    rounded="2xl"
+                    shadow="lg"
                     borderWidth="1px"
-                    borderColor="gray.200"
-                    transition="all 0.2s"
+                    borderColor="gray.100"
+                    position="relative"
+                    overflow="hidden"
+                    transition="all 0.3s"
                     _hover={{
-                      shadow: "lg",
-                      transform: "translateY(-2px)",
+                      shadow: "2xl",
+                      transform: "translateY(-4px)",
+                      borderColor: "navy.200",
+                    }}
+                    _before={{
+                      content: '""',
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: "4px",
+                      bg:
+                        index % 6 === 0
+                          ? "blue.500"
+                          : index % 6 === 1
+                          ? "purple.500"
+                          : index % 6 === 2
+                          ? "orange.500"
+                          : index % 6 === 3
+                          ? "teal.500"
+                          : index % 6 === 4
+                          ? "cyan.500"
+                          : "green.500",
                     }}
                   >
-                    <HStack justify="space-between" mb={2}>
-                      <Text fontSize="2xl">{stat.icon}</Text>
-                      <Text fontSize="2xl" fontWeight="bold" color="navy.700">
-                        {stat.value}
-                      </Text>
-                    </HStack>
-                    <Text
-                      fontSize="sm"
-                      fontWeight="semibold"
-                      color="gray.700"
-                      mb={1}
-                    >
-                      {stat.label}
-                    </Text>
-                    <Text fontSize="xs" color="gray.500">
-                      {stat.change}
-                    </Text>
+                    <Flex direction="column" gap={3}>
+                      <Flex justify="space-between" align="start">
+                        <Box
+                          bg={
+                            index % 6 === 0
+                              ? "blue.50"
+                              : index % 6 === 1
+                              ? "purple.50"
+                              : index % 6 === 2
+                              ? "orange.50"
+                              : index % 6 === 3
+                              ? "teal.50"
+                              : index % 6 === 4
+                              ? "cyan.50"
+                              : "green.50"
+                          }
+                          p={3}
+                          rounded="xl"
+                        >
+                          <Text fontSize="3xl">{stat.icon}</Text>
+                        </Box>
+                        <Box textAlign="right">
+                          <Text
+                            fontSize="3xl"
+                            fontWeight="bold"
+                            color="navy.700"
+                            lineHeight="1"
+                          >
+                            {stat.value}
+                          </Text>
+                        </Box>
+                      </Flex>
+                      <Box>
+                        <Text
+                          fontSize="sm"
+                          fontWeight="semibold"
+                          color="gray.700"
+                          mb={1}
+                        >
+                          {stat.label}
+                        </Text>
+                        <Text fontSize="xs" color="gray.500">
+                          {stat.change}
+                        </Text>
+                      </Box>
+                    </Flex>
                   </Box>
                 ))}
               </SimpleGrid>
 
-              {/* Quick Actions */}
-              <Box
-                bg="white"
-                rounded="xl"
-                shadow="md"
-                p={6}
-                borderWidth="1px"
-                borderColor="gray.200"
-              >
-                <Heading size="md" color="navy.700" mb={4}>
-                  ⚡ Quick Actions
-                </Heading>
-                <SimpleGrid columns={{ base: 1, sm: 2, md: 4 }} gap={3}>
-                  <Button
-                    bg="navy.600"
-                    color="white"
-                    _hover={{ bg: "navy.700" }}
-                    size="md"
-                    onClick={openNewAnnouncementModal}
-                  >
-                    <HStack gap={2}>
-                      <Text fontSize="lg">📢</Text>
-                      <Text fontSize="sm">New Announcement</Text>
-                    </HStack>
-                  </Button>
-                  <Button
-                    bg="navy.600"
-                    color="white"
-                    _hover={{ bg: "navy.700" }}
-                    size="md"
-                    onClick={() => setActiveTab("events")}
-                  >
-                    <HStack gap={2}>
-                      <Text fontSize="lg">🎉</Text>
-                      <Text fontSize="sm">Manage Events</Text>
-                    </HStack>
-                  </Button>
-                  <Button
-                    bg="navy.600"
-                    color="white"
-                    _hover={{ bg: "navy.700" }}
-                    size="md"
-                    onClick={() => setActiveTab("reservations")}
-                  >
-                    <HStack gap={2}>
-                      <Text fontSize="lg">📅</Text>
-                      <Text fontSize="sm">Reservations</Text>
-                    </HStack>
-                  </Button>
-                  <Button
-                    bg="navy.600"
-                    color="white"
-                    _hover={{ bg: "navy.700" }}
-                    size="md"
-                    onClick={() => setActiveTab("residents")}
-                  >
-                    <HStack gap={2}>
-                      <Text fontSize="lg">👥</Text>
-                      <Text fontSize="sm">View Residents</Text>
-                    </HStack>
-                  </Button>
-                </SimpleGrid>
-              </Box>
+              {/* Two Column Layout */}
+              <SimpleGrid columns={{ base: 1, lg: 2 }} gap={6}>
+                {/* Quick Actions */}
+                <Box
+                  bg="white"
+                  rounded="2xl"
+                  shadow="lg"
+                  p={6}
+                  borderWidth="1px"
+                  borderColor="gray.100"
+                >
+                  <Flex align="center" gap={3} mb={5}>
+                    <Box bg="navy.50" p={2} rounded="lg">
+                      <Text fontSize="2xl">⚡</Text>
+                    </Box>
+                    <Heading size="md" color="navy.700">
+                      Quick Actions
+                    </Heading>
+                  </Flex>
+                  <SimpleGrid columns={{ base: 1, sm: 2 }} gap={3}>
+                    <Button
+                      bg="navy.600"
+                      color="white"
+                      _hover={{ bg: "navy.700", transform: "scale(1.02)" }}
+                      size="lg"
+                      height="auto"
+                      py={4}
+                      transition="all 0.2s"
+                      onClick={openNewAnnouncementModal}
+                    >
+                      <VStack gap={1}>
+                        <Text fontSize="2xl">📢</Text>
+                        <Text fontSize="sm" fontWeight="semibold">
+                          New Announcement
+                        </Text>
+                      </VStack>
+                    </Button>
+                    <Button
+                      bg="purple.600"
+                      color="white"
+                      _hover={{ bg: "purple.700", transform: "scale(1.02)" }}
+                      size="lg"
+                      height="auto"
+                      py={4}
+                      transition="all 0.2s"
+                      onClick={() => setActiveTab("events")}
+                    >
+                      <VStack gap={1}>
+                        <Text fontSize="2xl">🎉</Text>
+                        <Text fontSize="sm" fontWeight="semibold">
+                          Manage Events
+                        </Text>
+                      </VStack>
+                    </Button>
+                    <Button
+                      bg="orange.600"
+                      color="white"
+                      _hover={{ bg: "orange.700", transform: "scale(1.02)" }}
+                      size="lg"
+                      height="auto"
+                      py={4}
+                      transition="all 0.2s"
+                      onClick={() => setActiveTab("reservations")}
+                    >
+                      <VStack gap={1}>
+                        <Text fontSize="2xl">📅</Text>
+                        <Text fontSize="sm" fontWeight="semibold">
+                          Reservations
+                        </Text>
+                      </VStack>
+                    </Button>
+                    <Button
+                      bg="teal.600"
+                      color="white"
+                      _hover={{ bg: "teal.700", transform: "scale(1.02)" }}
+                      size="lg"
+                      height="auto"
+                      py={4}
+                      transition="all 0.2s"
+                      onClick={() => setActiveTab("residents")}
+                    >
+                      <VStack gap={1}>
+                        <Text fontSize="2xl">👥</Text>
+                        <Text fontSize="sm" fontWeight="semibold">
+                          View Residents
+                        </Text>
+                      </VStack>
+                    </Button>
+                  </SimpleGrid>
+                </Box>
+
+                {/* Recent Activity */}
+                <Box
+                  bg="white"
+                  rounded="2xl"
+                  shadow="lg"
+                  p={6}
+                  borderWidth="1px"
+                  borderColor="gray.100"
+                >
+                  <Flex align="center" gap={3} mb={5}>
+                    <Box bg="green.50" p={2} rounded="lg">
+                      <Text fontSize="2xl">📊</Text>
+                    </Box>
+                    <Heading size="md" color="navy.700">
+                      Quick Stats
+                    </Heading>
+                  </Flex>
+                  <Stack gap={4}>
+                    <Box>
+                      <Flex justify="space-between" align="center" mb={2}>
+                        <Text fontSize="sm" color="gray.600">
+                          Active Announcements
+                        </Text>
+                        <Text fontSize="lg" fontWeight="bold" color="navy.700">
+                          {
+                            announcements.filter((a) => a.status === "active")
+                              .length
+                          }
+                        </Text>
+                      </Flex>
+                      <Box bg="gray.100" h="2" rounded="full" overflow="hidden">
+                        <Box
+                          bg="blue.500"
+                          h="full"
+                          w={`${
+                            (announcements.filter((a) => a.status === "active")
+                              .length /
+                              Math.max(announcements.length, 1)) *
+                            100
+                          }%`}
+                          transition="all 0.3s"
+                        />
+                      </Box>
+                    </Box>
+                    <Box>
+                      <Flex justify="space-between" align="center" mb={2}>
+                        <Text fontSize="sm" color="gray.600">
+                          Total Bookings
+                        </Text>
+                        <Text fontSize="lg" fontWeight="bold" color="navy.700">
+                          {bookings.length}
+                        </Text>
+                      </Flex>
+                      <Box bg="gray.100" h="2" rounded="full" overflow="hidden">
+                        <Box
+                          bg="purple.500"
+                          h="full"
+                          w={bookings.length > 0 ? "75%" : "0%"}
+                          transition="all 0.3s"
+                        />
+                      </Box>
+                    </Box>
+                    <Box>
+                      <Flex justify="space-between" align="center" mb={2}>
+                        <Text fontSize="sm" color="gray.600">
+                          Approved Reservations
+                        </Text>
+                        <Text fontSize="lg" fontWeight="bold" color="navy.700">
+                          {
+                            clubhouseReservations.filter(
+                              (r) => r.status === "approved"
+                            ).length
+                          }
+                        </Text>
+                      </Flex>
+                      <Box bg="gray.100" h="2" rounded="full" overflow="hidden">
+                        <Box
+                          bg="green.500"
+                          h="full"
+                          w={`${
+                            (clubhouseReservations.filter(
+                              (r) => r.status === "approved"
+                            ).length /
+                              Math.max(clubhouseReservations.length, 1)) *
+                            100
+                          }%`}
+                          transition="all 0.3s"
+                        />
+                      </Box>
+                    </Box>
+                  </Stack>
+                </Box>
+              </SimpleGrid>
             </Stack>
           )}
 
