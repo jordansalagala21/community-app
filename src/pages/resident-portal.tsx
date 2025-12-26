@@ -12,6 +12,8 @@ import {
   Input,
   Dialog,
   RadioGroup,
+  NativeSelectRoot,
+  NativeSelectField,
 } from "@chakra-ui/react";
 import { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
@@ -47,6 +49,22 @@ type AnnouncementItem = {
   date: string;
   status?: string;
   createdAt?: any;
+};
+
+type ClubhouseReservation = {
+  id: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  purpose: string;
+  deposit: number;
+  isAvailable: boolean;
+  reservedBy?: string;
+  reservedByEmail?: string;
+  reservedByName?: string;
+  reservedAt?: string;
+  paymentMethod?: string;
+  status?: string;
 };
 
 const EventCard = ({ event, user }: { event: EventItem; user: any }) => {
@@ -604,6 +622,24 @@ export default function ResidentPortal() {
   const [filterCategory, setFilterCategory] = useState<string>("All");
   const [events, setEvents] = useState<EventItem[]>([]);
   const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([]);
+  const [clubhouseReservations, setClubhouseReservations] = useState<
+    ClubhouseReservation[]
+  >([]);
+  const [isClubhouseModalOpen, setIsClubhouseModalOpen] = useState(false);
+  const [clubhousePaymentMethod, setClubhousePaymentMethod] = useState("cash");
+  const [isBookingClubhouse, setIsBookingClubhouse] = useState(false);
+  const [clubhouseForm, setClubhouseForm] = useState({
+    date: "",
+    startTime: "",
+    endTime: "",
+    purpose: "",
+  });
+  const [clubhouseErrors, setClubhouseErrors] = useState({
+    date: "",
+    startTime: "",
+    endTime: "",
+    purpose: "",
+  });
   const [loading, setLoading] = useState(true);
   const [isDeactivateModalOpen, setIsDeactivateModalOpen] = useState(false);
   const [isDeactivating, setIsDeactivating] = useState(false);
@@ -619,10 +655,11 @@ export default function ResidentPortal() {
     "Service",
   ];
 
-  // Load events and announcements from Firestore
+  // Load events, announcements, and clubhouse from Firestore
   useEffect(() => {
     loadEvents();
     loadAnnouncements();
+    loadClubhouseReservations();
   }, []);
 
   const loadEvents = async () => {
@@ -659,6 +696,156 @@ export default function ResidentPortal() {
       setAnnouncements(loadedAnnouncements);
     } catch (error) {
       console.error("Error loading announcements:", error);
+    }
+  };
+
+  const loadClubhouseReservations = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, "clubhouse"));
+      const loadedReservations: ClubhouseReservation[] = [];
+      querySnapshot.forEach((doc) => {
+        const reservation = {
+          id: doc.id,
+          ...doc.data(),
+        } as ClubhouseReservation;
+        // Only show available slots or future reservations
+        const reservationDate = new Date(reservation.date);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (reservationDate >= today) {
+          loadedReservations.push(reservation);
+        }
+      });
+      // Sort by date and time
+      loadedReservations.sort((a, b) => {
+        const dateCompare =
+          new Date(a.date).getTime() - new Date(b.date).getTime();
+        if (dateCompare !== 0) return dateCompare;
+        return a.startTime.localeCompare(b.startTime);
+      });
+      setClubhouseReservations(loadedReservations);
+    } catch (error) {
+      console.error("Error loading clubhouse reservations:", error);
+    }
+  };
+
+  const handleBookClubhouse = async () => {
+    if (!user) return;
+
+    // Reset errors
+    const errors = {
+      date: "",
+      startTime: "",
+      endTime: "",
+      purpose: "",
+    };
+    let hasError = false;
+
+    // Validate date
+    if (!clubhouseForm.date) {
+      errors.date = "Date is required";
+      hasError = true;
+    } else {
+      const selectedDate = new Date(clubhouseForm.date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      if (selectedDate < today) {
+        errors.date = "Date cannot be in the past";
+        hasError = true;
+      }
+    }
+
+    // Validate start time
+    if (!clubhouseForm.startTime) {
+      errors.startTime = "Start time is required";
+      hasError = true;
+    }
+
+    // Validate end time
+    if (!clubhouseForm.endTime) {
+      errors.endTime = "End time is required";
+      hasError = true;
+    }
+
+    // Additional time validation only if both times are provided
+    if (clubhouseForm.startTime && clubhouseForm.endTime) {
+      // Check if end time is after start time
+      const startMinutes =
+        parseInt(clubhouseForm.startTime.split(":")[0]) * 60 +
+        parseInt(clubhouseForm.startTime.split(":")[1]);
+      const endMinutes =
+        parseInt(clubhouseForm.endTime.split(":")[0]) * 60 +
+        parseInt(clubhouseForm.endTime.split(":")[1]);
+
+      if (endMinutes <= startMinutes) {
+        errors.endTime = "End time must be after start time";
+        hasError = true;
+      } else if (endMinutes - startMinutes < 60) {
+        errors.endTime = "Reservation must be at least 1 hour";
+        hasError = true;
+      }
+    }
+
+    // Validate purpose
+    if (!clubhouseForm.purpose.trim()) {
+      errors.purpose = "Purpose/Event type is required";
+      hasError = true;
+    } else if (clubhouseForm.purpose.trim().length < 3) {
+      errors.purpose = "Purpose must be at least 3 characters";
+      hasError = true;
+    } else if (clubhouseForm.purpose.trim().length > 100) {
+      errors.purpose = "Purpose must be less than 100 characters";
+      hasError = true;
+    }
+
+    setClubhouseErrors(errors);
+
+    if (hasError) {
+      return;
+    }
+
+    try {
+      setIsBookingClubhouse(true);
+
+      // Create new clubhouse reservation request
+      await addDoc(collection(db, "clubhouse"), {
+        date: clubhouseForm.date,
+        startTime: clubhouseForm.startTime,
+        endTime: clubhouseForm.endTime,
+        purpose: clubhouseForm.purpose.trim(),
+        deposit: 100, // Default deposit
+        isAvailable: false,
+        status: "pending",
+        reservedBy: user.uid,
+        reservedByEmail: user.email,
+        reservedByName:
+          user.displayName || user.email?.split("@")[0] || "Guest",
+        reservedAt: new Date().toISOString(),
+        paymentMethod: clubhousePaymentMethod,
+      });
+
+      alert("Reservation request submitted! Please wait for admin approval.");
+      setIsClubhouseModalOpen(false);
+      setClubhousePaymentMethod("cash");
+      setClubhouseForm({
+        date: "",
+        startTime: "",
+        endTime: "",
+        purpose: "",
+      });
+      setClubhouseErrors({
+        date: "",
+        startTime: "",
+        endTime: "",
+        purpose: "",
+      });
+      await loadClubhouseReservations();
+    } catch (error) {
+      console.error("Clubhouse booking error:", error);
+      alert("Failed to submit reservation request. Please try again.");
+    } finally {
+      setIsBookingClubhouse(false);
     }
   };
 
@@ -1027,53 +1214,501 @@ export default function ResidentPortal() {
         )}
       </Container>
 
-      {/* CLUBHOUSE RESERVATION CTA */}
+      {/* CLUBHOUSE RESERVATIONS SECTION */}
       <Container maxW="7xl" py={{ base: 10, md: 16 }} px={{ base: 4, md: 6 }}>
-        <Box
-          bg="navy.600"
-          color="white"
-          p={{ base: 6, md: 12 }}
-          rounded={{ base: "2xl", md: "3xl" }}
-          shadow="2xl"
-        >
-          <Flex
-            direction={{ base: "column", md: "row" }}
-            align={{ base: "stretch", md: "center" }}
-            justify="space-between"
-            gap={{ base: 4, md: 6 }}
-            textAlign={{ base: "center", md: "left" }}
+        <Box textAlign="center" mb={{ base: 8, md: 12 }}>
+          <Heading
+            size={{ base: "xl", md: "2xl" }}
+            mb={{ base: 3, md: 4 }}
+            color="navy.700"
           >
-            <Box>
-              <Heading
-                size={{ base: "lg", md: "xl" }}
-                mb={{ base: 2, md: 3 }}
-                fontWeight="bold"
-              >
-                Need to reserve the clubhouse?
-              </Heading>
-              <Text fontSize={{ base: "md", md: "lg" }} color="whiteAlpha.900">
-                View availability and book your private event today.
+            🏠 Clubhouse Reservations
+          </Heading>
+          <Text
+            fontSize={{ base: "md", md: "lg" }}
+            color="gray.600"
+            maxW="2xl"
+            mx="auto"
+            px={{ base: 2, md: 0 }}
+          >
+            Reserve the clubhouse for your private events
+          </Text>
+          <Button
+            onClick={() => setIsClubhouseModalOpen(true)}
+            size="lg"
+            bg="navy.600"
+            color="white"
+            _hover={{ bg: "navy.700" }}
+            px={8}
+            mt={4}
+          >
+            + Request Reservation
+          </Button>
+        </Box>
+
+        {/* My Reservations */}
+        <Box>
+          <Heading size="md" color="navy.700" mb={4}>
+            My Reservations
+          </Heading>
+          {clubhouseReservations.filter((r) => r.reservedBy === user?.uid)
+            .length === 0 ? (
+            <Box
+              textAlign="center"
+              py={8}
+              bg="white"
+              rounded="xl"
+              shadow="md"
+              borderWidth="1px"
+              borderColor="gray.200"
+            >
+              <Text fontSize="md" color="gray.600">
+                You haven't made any reservations yet.
               </Text>
             </Box>
-            <Button
-              onClick={() => (window.location.href = "/reservations")}
-              size="lg"
-              bg="white"
-              color="navy.600"
-              px={{ base: 6, md: 8 }}
-              py={6}
-              fontSize="md"
-              fontWeight="bold"
-              flexShrink={0}
-              width={{ base: "full", md: "auto" }}
-              _hover={{
-                bg: "whiteAlpha.900",
-              }}
+          ) : (
+            <SimpleGrid
+              columns={{ base: 1, md: 2, lg: 3 }}
+              gap={{ base: 4, md: 6 }}
             >
-              📅 View Calendar
-            </Button>
-          </Flex>
+              {clubhouseReservations
+                .filter((r) => r.reservedBy === user?.uid)
+                .map((reservation) => (
+                  <Box
+                    key={reservation.id}
+                    bg="white"
+                    borderWidth="2px"
+                    borderColor={
+                      reservation.status === "approved"
+                        ? "green.200"
+                        : reservation.status === "pending"
+                        ? "orange.200"
+                        : "red.200"
+                    }
+                    rounded="xl"
+                    shadow="lg"
+                    p={{ base: 5, md: 6 }}
+                    transition="all 0.3s"
+                  >
+                    <Stack gap={4}>
+                      {/* Header */}
+                      <Flex justify="space-between" align="start" gap={3}>
+                        <Box flex="1">
+                          <HStack gap={2} mb={2}>
+                            <Text fontSize="2xl">🏠</Text>
+                            <Heading size="md" color="navy.700">
+                              Clubhouse
+                            </Heading>
+                          </HStack>
+                          <HStack gap={2} flexWrap="wrap">
+                            <Box
+                              as="span"
+                              px={2}
+                              py={0.5}
+                              bg={
+                                reservation.status === "approved"
+                                  ? "green.100"
+                                  : reservation.status === "pending"
+                                  ? "orange.100"
+                                  : "red.100"
+                              }
+                              color={
+                                reservation.status === "approved"
+                                  ? "green.700"
+                                  : reservation.status === "pending"
+                                  ? "orange.700"
+                                  : "red.700"
+                              }
+                              rounded="full"
+                              fontSize="xs"
+                              fontWeight="bold"
+                            >
+                              {reservation.status === "approved"
+                                ? "Approved"
+                                : reservation.status === "pending"
+                                ? "Pending Approval"
+                                : "Rejected"}
+                            </Box>
+                            <Box
+                              as="span"
+                              px={2}
+                              py={0.5}
+                              bg="blue.100"
+                              color="blue.700"
+                              rounded="full"
+                              fontSize="xs"
+                              fontWeight="bold"
+                            >
+                              ${reservation.deposit || 100} Deposit
+                            </Box>
+                          </HStack>
+                        </Box>
+                      </Flex>
+
+                      {/* Details */}
+                      <Stack gap={2} fontSize="sm" color="gray.600">
+                        <HStack gap={2}>
+                          <Text fontWeight="semibold">📅</Text>
+                          <Text>
+                            {new Date(reservation.date).toLocaleDateString()}
+                          </Text>
+                        </HStack>
+                        <HStack gap={2}>
+                          <Text fontWeight="semibold">🕐</Text>
+                          <Text>
+                            {reservation.startTime} - {reservation.endTime}
+                          </Text>
+                        </HStack>
+                        <HStack gap={2}>
+                          <Text fontWeight="semibold">📝</Text>
+                          <Text>{reservation.purpose}</Text>
+                        </HStack>
+                        <HStack gap={2}>
+                          <Text fontWeight="semibold">💳</Text>
+                          <Text>{reservation.paymentMethod || "Cash"}</Text>
+                        </HStack>
+                      </Stack>
+
+                      {reservation.reservedAt && (
+                        <Text fontSize="xs" color="gray.500">
+                          Requested on{" "}
+                          {new Date(
+                            reservation.reservedAt
+                          ).toLocaleDateString()}
+                        </Text>
+                      )}
+                    </Stack>
+                  </Box>
+                ))}
+            </SimpleGrid>
+          )}
         </Box>
+
+        {/* Clubhouse Booking Modal */}
+        <Dialog.Root
+          open={isClubhouseModalOpen}
+          onOpenChange={(e) => setIsClubhouseModalOpen(e.open)}
+        >
+          <Dialog.Backdrop />
+          <Dialog.Positioner>
+            <Dialog.Content maxW="500px">
+              <Dialog.Header>
+                <Dialog.Title>Request Clubhouse Reservation</Dialog.Title>
+                <Dialog.CloseTrigger />
+              </Dialog.Header>
+              <Dialog.Body>
+                <Stack gap={4}>
+                  <Box>
+                    <Text mb={2} fontWeight="medium">
+                      Date *
+                    </Text>
+                    <Input
+                      type="date"
+                      value={clubhouseForm.date}
+                      min={new Date().toISOString().split("T")[0]}
+                      onChange={(e) => {
+                        setClubhouseForm({
+                          ...clubhouseForm,
+                          date: e.target.value,
+                        });
+                        setClubhouseErrors({ ...clubhouseErrors, date: "" });
+                      }}
+                      borderColor={
+                        clubhouseErrors.date ? "red.500" : "gray.200"
+                      }
+                    />
+                    {clubhouseErrors.date && (
+                      <Text color="red.500" fontSize="sm" mt={1}>
+                        {clubhouseErrors.date}
+                      </Text>
+                    )}
+                  </Box>
+
+                  <SimpleGrid columns={2} gap={3}>
+                    <Box>
+                      <Text mb={2} fontWeight="medium">
+                        Start Time *
+                      </Text>
+                      <HStack gap={2}>
+                        <NativeSelectRoot>
+                          <NativeSelectField
+                            value={clubhouseForm.startTime.split(":")[0] || ""}
+                            onChange={(e) => {
+                              const hour = e.target.value;
+                              const minute =
+                                clubhouseForm.startTime.split(":")[1] || "00";
+                              setClubhouseForm({
+                                ...clubhouseForm,
+                                startTime: `${hour}:${minute}`,
+                              });
+                              setClubhouseErrors({
+                                ...clubhouseErrors,
+                                startTime: "",
+                              });
+                            }}
+                            borderColor={
+                              clubhouseErrors.startTime ? "red.500" : "gray.200"
+                            }
+                          >
+                            <option value="">Hour</option>
+                            {Array.from({ length: 24 }, (_, i) => (
+                              <option
+                                key={i}
+                                value={String(i).padStart(2, "0")}
+                              >
+                                {String(i).padStart(2, "0")}
+                              </option>
+                            ))}
+                          </NativeSelectField>
+                        </NativeSelectRoot>
+                        <Text>:</Text>
+                        <NativeSelectRoot>
+                          <NativeSelectField
+                            value={clubhouseForm.startTime.split(":")[1] || ""}
+                            onChange={(e) => {
+                              const hour =
+                                clubhouseForm.startTime.split(":")[0] || "00";
+                              const minute = e.target.value;
+                              setClubhouseForm({
+                                ...clubhouseForm,
+                                startTime: `${hour}:${minute}`,
+                              });
+                              setClubhouseErrors({
+                                ...clubhouseErrors,
+                                startTime: "",
+                              });
+                            }}
+                            borderColor={
+                              clubhouseErrors.startTime ? "red.500" : "gray.200"
+                            }
+                          >
+                            <option value="">Min</option>
+                            {["00", "15", "30", "45"].map((min) => (
+                              <option key={min} value={min}>
+                                {min}
+                              </option>
+                            ))}
+                          </NativeSelectField>
+                        </NativeSelectRoot>
+                      </HStack>
+                      {clubhouseErrors.startTime && (
+                        <Text color="red.500" fontSize="xs" mt={1}>
+                          {clubhouseErrors.startTime}
+                        </Text>
+                      )}
+                    </Box>
+                    <Box>
+                      <Text mb={2} fontWeight="medium">
+                        End Time *
+                      </Text>
+                      <HStack gap={2}>
+                        <NativeSelectRoot>
+                          <NativeSelectField
+                            value={clubhouseForm.endTime.split(":")[0] || ""}
+                            onChange={(e) => {
+                              const hour = e.target.value;
+                              const minute =
+                                clubhouseForm.endTime.split(":")[1] || "00";
+                              setClubhouseForm({
+                                ...clubhouseForm,
+                                endTime: `${hour}:${minute}`,
+                              });
+                              setClubhouseErrors({
+                                ...clubhouseErrors,
+                                endTime: "",
+                              });
+                            }}
+                            borderColor={
+                              clubhouseErrors.endTime ? "red.500" : "gray.200"
+                            }
+                          >
+                            <option value="">Hour</option>
+                            {Array.from({ length: 24 }, (_, i) => (
+                              <option
+                                key={i}
+                                value={String(i).padStart(2, "0")}
+                              >
+                                {String(i).padStart(2, "0")}
+                              </option>
+                            ))}
+                          </NativeSelectField>
+                        </NativeSelectRoot>
+                        <Text>:</Text>
+                        <NativeSelectRoot>
+                          <NativeSelectField
+                            value={clubhouseForm.endTime.split(":")[1] || ""}
+                            onChange={(e) => {
+                              const hour =
+                                clubhouseForm.endTime.split(":")[0] || "00";
+                              const minute = e.target.value;
+                              setClubhouseForm({
+                                ...clubhouseForm,
+                                endTime: `${hour}:${minute}`,
+                              });
+                              setClubhouseErrors({
+                                ...clubhouseErrors,
+                                endTime: "",
+                              });
+                            }}
+                            borderColor={
+                              clubhouseErrors.endTime ? "red.500" : "gray.200"
+                            }
+                          >
+                            <option value="">Min</option>
+                            {["00", "15", "30", "45"].map((min) => (
+                              <option key={min} value={min}>
+                                {min}
+                              </option>
+                            ))}
+                          </NativeSelectField>
+                        </NativeSelectRoot>
+                      </HStack>
+                      {clubhouseErrors.endTime && (
+                        <Text color="red.500" fontSize="xs" mt={1}>
+                          {clubhouseErrors.endTime}
+                        </Text>
+                      )}
+                    </Box>
+                  </SimpleGrid>
+
+                  <Box>
+                    <Flex justify="space-between" align="center" mb={2}>
+                      <Text fontWeight="medium">Purpose/Event Type *</Text>
+                      <Text fontSize="xs" color="gray.500">
+                        {clubhouseForm.purpose.length}/100
+                      </Text>
+                    </Flex>
+                    <Input
+                      placeholder="e.g., Birthday Party, Family Gathering, Meeting"
+                      value={clubhouseForm.purpose}
+                      maxLength={100}
+                      onChange={(e) => {
+                        setClubhouseForm({
+                          ...clubhouseForm,
+                          purpose: e.target.value,
+                        });
+                        setClubhouseErrors({
+                          ...clubhouseErrors,
+                          purpose: "",
+                        });
+                      }}
+                      borderColor={
+                        clubhouseErrors.purpose ? "red.500" : "gray.200"
+                      }
+                    />
+                    {clubhouseErrors.purpose && (
+                      <Text color="red.500" fontSize="sm" mt={1}>
+                        {clubhouseErrors.purpose}
+                      </Text>
+                    )}
+                  </Box>
+
+                  <Box>
+                    <Text mb={3} fontWeight="medium">
+                      Payment Method for Deposit *
+                    </Text>
+                    <RadioGroup.Root
+                      value={clubhousePaymentMethod}
+                      onValueChange={(e) =>
+                        setClubhousePaymentMethod(e.value || "cash")
+                      }
+                    >
+                      <Stack gap={3}>
+                        <RadioGroup.Item value="cash">
+                          <RadioGroup.ItemControl />
+                          <HStack gap={2}>
+                            <Text fontSize="xl">💵</Text>
+                            <RadioGroup.ItemText>Cash</RadioGroup.ItemText>
+                          </HStack>
+                          <RadioGroup.ItemHiddenInput />
+                        </RadioGroup.Item>
+                        <RadioGroup.Item value="zelle">
+                          <RadioGroup.ItemControl />
+                          <HStack gap={2}>
+                            <Text fontSize="xl">📱</Text>
+                            <RadioGroup.ItemText>Zelle</RadioGroup.ItemText>
+                          </HStack>
+                          <RadioGroup.ItemHiddenInput />
+                        </RadioGroup.Item>
+                      </Stack>
+                    </RadioGroup.Root>
+                  </Box>
+
+                  <Box
+                    p={3}
+                    bg="blue.50"
+                    rounded="md"
+                    borderWidth="1px"
+                    borderColor="blue.200"
+                  >
+                    <Text
+                      fontSize="sm"
+                      fontWeight="medium"
+                      color="blue.700"
+                      mb={1}
+                    >
+                      Deposit Required: $100
+                    </Text>
+                    <Text fontSize="xs" color="gray.700">
+                      Refundable deposit. Will be returned after your event if
+                      the clubhouse is left in good condition.
+                    </Text>
+                  </Box>
+
+                  <Box
+                    p={3}
+                    bg="yellow.50"
+                    rounded="md"
+                    borderWidth="1px"
+                    borderColor="yellow.200"
+                  >
+                    <Text fontSize="sm" color="gray.700">
+                      <strong>Note:</strong> Your reservation request will be
+                      sent to the admin for approval. You'll be notified once
+                      it's reviewed.
+                    </Text>
+                  </Box>
+                </Stack>
+              </Dialog.Body>
+              <Dialog.Footer>
+                <Stack gap={2} width="full">
+                  <Button
+                    onClick={handleBookClubhouse}
+                    loading={isBookingClubhouse}
+                    w="full"
+                    size="lg"
+                    bg="navy.600"
+                    color="white"
+                    _hover={{ bg: "navy.700" }}
+                  >
+                    Submit Request
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setIsClubhouseModalOpen(false);
+                      setClubhouseForm({
+                        date: "",
+                        startTime: "",
+                        endTime: "",
+                        purpose: "",
+                      });
+                      setClubhouseErrors({
+                        date: "",
+                        startTime: "",
+                        endTime: "",
+                        purpose: "",
+                      });
+                    }}
+                    w="full"
+                  >
+                    Cancel
+                  </Button>
+                </Stack>
+              </Dialog.Footer>
+            </Dialog.Content>
+          </Dialog.Positioner>
+        </Dialog.Root>
       </Container>
 
       {/* FOOTER */}

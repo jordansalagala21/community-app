@@ -49,6 +49,22 @@ type AnnouncementItem = {
   createdAt?: any;
 };
 
+type ClubhouseReservation = {
+  id: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  purpose: string;
+  deposit: number;
+  isAvailable: boolean;
+  reservedBy?: string;
+  reservedByEmail?: string;
+  reservedByName?: string;
+  reservedAt?: string;
+  paymentMethod?: string;
+  status?: string;
+};
+
 // Events and Announcements are now loaded from Firestore
 
 function DashboardContent() {
@@ -74,6 +90,19 @@ function DashboardContent() {
     ticketCount: 0,
     paymentMethod: "cash",
   });
+  const [clubhouseReservations, setClubhouseReservations] = useState<
+    ClubhouseReservation[]
+  >([]);
+  const [isClubhouseModalOpen, setIsClubhouseModalOpen] = useState(false);
+  const [editingClubhouse, setEditingClubhouse] =
+    useState<ClubhouseReservation | null>(null);
+  const [clubhouseForm, setClubhouseForm] = useState({
+    date: "",
+    startTime: "",
+    endTime: "",
+    purpose: "General Use",
+    deposit: 100,
+  });
   const [announcementForm, setAnnouncementForm] = useState({
     title: "",
     content: "",
@@ -96,12 +125,13 @@ function DashboardContent() {
     window.location.href = "/";
   };
 
-  // Load events, residents, announcements, and bookings from Firestore
+  // Load events, residents, announcements, bookings, and clubhouse from Firestore
   useEffect(() => {
     loadEvents();
     loadResidents();
     loadAnnouncements();
     loadBookings();
+    loadClubhouseReservations();
   }, []);
 
   const loadResidents = async () => {
@@ -157,6 +187,146 @@ function DashboardContent() {
       setBookings(loadedBookings);
     } catch (error) {
       console.error("Error loading bookings:", error);
+    }
+  };
+
+  const loadClubhouseReservations = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, "clubhouse"));
+      const loadedReservations: ClubhouseReservation[] = [];
+      querySnapshot.forEach((doc) => {
+        loadedReservations.push({
+          id: doc.id,
+          ...doc.data(),
+        } as ClubhouseReservation);
+      });
+      // Sort by date and time
+      loadedReservations.sort((a, b) => {
+        const dateCompare =
+          new Date(a.date).getTime() - new Date(b.date).getTime();
+        if (dateCompare !== 0) return dateCompare;
+        return a.startTime.localeCompare(b.startTime);
+      });
+      setClubhouseReservations(loadedReservations);
+    } catch (error) {
+      console.error("Error loading clubhouse reservations:", error);
+    }
+  };
+
+  const handleCreateClubhouse = async () => {
+    if (
+      !clubhouseForm.date ||
+      !clubhouseForm.startTime ||
+      !clubhouseForm.endTime
+    ) {
+      alert("Please fill in all required fields");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      if (editingClubhouse) {
+        await updateDoc(doc(db, "clubhouse", editingClubhouse.id), {
+          date: clubhouseForm.date,
+          startTime: clubhouseForm.startTime,
+          endTime: clubhouseForm.endTime,
+          purpose: clubhouseForm.purpose,
+          deposit: clubhouseForm.deposit,
+        });
+      } else {
+        await addDoc(collection(db, "clubhouse"), {
+          date: clubhouseForm.date,
+          startTime: clubhouseForm.startTime,
+          endTime: clubhouseForm.endTime,
+          purpose: clubhouseForm.purpose,
+          deposit: clubhouseForm.deposit,
+          isAvailable: true,
+          status: "available",
+        });
+      }
+      await loadClubhouseReservations();
+      setIsClubhouseModalOpen(false);
+      setEditingClubhouse(null);
+      setClubhouseForm({
+        date: "",
+        startTime: "",
+        endTime: "",
+        purpose: "General Use",
+        deposit: 100,
+      });
+    } catch (error) {
+      console.error("Error saving clubhouse slot:", error);
+      alert("Failed to save clubhouse slot");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteClubhouse = async (reservationId: string) => {
+    if (!confirm("Are you sure you want to delete this clubhouse slot?"))
+      return;
+
+    try {
+      await deleteDoc(doc(db, "clubhouse", reservationId));
+      await loadClubhouseReservations();
+    } catch (error) {
+      console.error("Error deleting clubhouse slot:", error);
+      alert("Failed to delete clubhouse slot");
+    }
+  };
+
+  const handleCancelReservation = async (reservation: ClubhouseReservation) => {
+    if (
+      !confirm(
+        `Are you sure you want to cancel ${reservation.reservedByName}'s reservation?`
+      )
+    )
+      return;
+
+    try {
+      await updateDoc(doc(db, "clubhouse", reservation.id), {
+        status: "cancelled",
+      });
+      await loadClubhouseReservations();
+      alert("Reservation cancelled successfully!");
+    } catch (error) {
+      console.error("Error cancelling reservation:", error);
+      alert("Failed to cancel reservation");
+    }
+  };
+
+  const handleApproveReservation = async (
+    reservation: ClubhouseReservation
+  ) => {
+    try {
+      await updateDoc(doc(db, "clubhouse", reservation.id), {
+        status: "approved",
+      });
+      await loadClubhouseReservations();
+      alert("Reservation approved successfully!");
+    } catch (error) {
+      console.error("Error approving reservation:", error);
+      alert("Failed to approve reservation");
+    }
+  };
+
+  const handleRejectReservation = async (reservation: ClubhouseReservation) => {
+    if (
+      !confirm(
+        `Are you sure you want to reject ${reservation.reservedByName}'s reservation request?`
+      )
+    )
+      return;
+
+    try {
+      await updateDoc(doc(db, "clubhouse", reservation.id), {
+        status: "rejected",
+      });
+      await loadClubhouseReservations();
+      alert("Reservation rejected.");
+    } catch (error) {
+      console.error("Error rejecting reservation:", error);
+      alert("Failed to reject reservation");
     }
   };
 
@@ -588,9 +758,21 @@ function DashboardContent() {
   };
 
   // Calculate dynamic stats from database
-  const totalRevenue = events.reduce((sum, event) => {
-    return sum + event.price * (100 - event.availableTickets); // Approximate sold tickets
+  const eventRevenue = bookings.reduce((sum, booking) => {
+    return sum + (booking.totalAmount || 0);
   }, 0);
+
+  const clubhouseRevenue = clubhouseReservations
+    .filter((res) => res.status === "approved")
+    .reduce((sum, res) => {
+      return sum + (res.deposit || 0);
+    }, 0);
+
+  const totalRevenue = eventRevenue + clubhouseRevenue;
+
+  const pendingReservationsCount = clubhouseReservations.filter(
+    (res) => res.status === "pending"
+  ).length;
 
   const stats = [
     {
@@ -609,16 +791,34 @@ function DashboardContent() {
     },
     {
       label: "Pending Reservations",
-      value: "0",
+      value: pendingReservationsCount.toString(),
       icon: "📅",
-      change: "Feature coming soon",
+      change:
+        pendingReservationsCount === 0
+          ? "No pending requests"
+          : "Awaiting approval",
       color: "orange",
+    },
+    {
+      label: "Event Revenue",
+      value: `$${eventRevenue.toFixed(2)}`,
+      icon: "🎫",
+      change: eventRevenue === 0 ? "No ticket sales" : "From ticket bookings",
+      color: "teal",
+    },
+    {
+      label: "Clubhouse Revenue",
+      value: `$${clubhouseRevenue.toFixed(2)}`,
+      icon: "🏠",
+      change:
+        clubhouseRevenue === 0 ? "No deposits" : "From approved reservations",
+      color: "cyan",
     },
     {
       label: "Total Revenue",
       value: `$${totalRevenue.toFixed(2)}`,
       icon: "💰",
-      change: totalRevenue === 0 ? "No sales yet" : "Event ticket sales",
+      change: totalRevenue === 0 ? "No revenue yet" : "Events + Clubhouse",
       color: "green",
     },
   ];
@@ -798,7 +998,7 @@ function DashboardContent() {
           {activeTab === "overview" && (
             <Stack gap={6}>
               {/* Stats Grid */}
-              <SimpleGrid columns={{ base: 1, sm: 2, lg: 4 }} gap={4}>
+              <SimpleGrid columns={{ base: 1, sm: 2, lg: 3 }} gap={4}>
                 {stats.map((stat) => (
                   <Box
                     key={stat.label}
@@ -1176,21 +1376,281 @@ function DashboardContent() {
           {activeTab === "reservations" && (
             <Stack gap={6}>
               <Heading size="lg" color="navy.700">
-                Facility Reservations
+                Clubhouse Reservations
               </Heading>
-              <Box
-                bg="white"
-                rounded="xl"
-                shadow="md"
-                p={6}
-                borderWidth="1px"
-                borderColor="gray.200"
-              >
-                <Text color="gray.600">
-                  Reservation management system coming soon. Track clubhouse,
-                  pool, and amenity bookings.
-                </Text>
-              </Box>
+
+              {/* Summary Cards */}
+              <SimpleGrid columns={{ base: 1, sm: 2, lg: 4 }} gap={4}>
+                <Box
+                  bg="white"
+                  p={5}
+                  rounded="xl"
+                  shadow="md"
+                  borderWidth="1px"
+                  borderColor="gray.200"
+                >
+                  <Text fontSize="sm" color="gray.600" mb={2}>
+                    Total Bookings
+                  </Text>
+                  <Text fontSize="3xl" fontWeight="bold" color="navy.700">
+                    {clubhouseReservations.length}
+                  </Text>
+                </Box>
+                <Box
+                  bg="white"
+                  p={5}
+                  rounded="xl"
+                  shadow="md"
+                  borderWidth="1px"
+                  borderColor="gray.200"
+                >
+                  <Text fontSize="sm" color="gray.600" mb={2}>
+                    Pending
+                  </Text>
+                  <Text fontSize="3xl" fontWeight="bold" color="orange.600">
+                    {
+                      clubhouseReservations.filter(
+                        (r) => r.status === "pending"
+                      ).length
+                    }
+                  </Text>
+                </Box>
+                <Box
+                  bg="white"
+                  p={5}
+                  rounded="xl"
+                  shadow="md"
+                  borderWidth="1px"
+                  borderColor="gray.200"
+                >
+                  <Text fontSize="sm" color="gray.600" mb={2}>
+                    Approved
+                  </Text>
+                  <Text fontSize="3xl" fontWeight="bold" color="green.600">
+                    {
+                      clubhouseReservations.filter(
+                        (r) => r.status === "approved"
+                      ).length
+                    }
+                  </Text>
+                </Box>
+                <Box
+                  bg="white"
+                  p={5}
+                  rounded="xl"
+                  shadow="md"
+                  borderWidth="1px"
+                  borderColor="gray.200"
+                >
+                  <Text fontSize="sm" color="gray.600" mb={2}>
+                    Total Deposits
+                  </Text>
+                  <Text fontSize="3xl" fontWeight="bold" color="blue.600">
+                    $
+                    {clubhouseReservations
+                      .filter((r) => r.status === "approved")
+                      .reduce((sum, r) => sum + (r.deposit || 100), 0)}
+                  </Text>
+                </Box>
+              </SimpleGrid>
+
+              {/* Reservations List */}
+              {clubhouseReservations.length === 0 ? (
+                <Box
+                  bg="white"
+                  rounded="xl"
+                  shadow="md"
+                  p={8}
+                  borderWidth="1px"
+                  borderColor="gray.200"
+                  textAlign="center"
+                >
+                  <Text color="gray.600" fontSize="lg">
+                    No clubhouse reservations yet. Residents can create booking
+                    requests from the portal.
+                  </Text>
+                </Box>
+              ) : (
+                <SimpleGrid columns={{ base: 1, lg: 2 }} gap={6}>
+                  {clubhouseReservations.map((reservation) => (
+                    <Box
+                      key={reservation.id}
+                      bg="white"
+                      p={6}
+                      rounded="xl"
+                      shadow="md"
+                      borderWidth="2px"
+                      borderColor={
+                        reservation.isAvailable ? "green.200" : "orange.200"
+                      }
+                      _hover={{ shadow: "lg" }}
+                      transition="all 0.2s"
+                    >
+                      <Stack gap={4}>
+                        {/* Header */}
+                        <Flex justify="space-between" align="start">
+                          <Box flex="1">
+                            <HStack gap={2} mb={2}>
+                              <Text fontSize="2xl">🏠</Text>
+                              <Heading size="md" color="navy.700">
+                                Clubhouse
+                              </Heading>
+                            </HStack>
+                            <HStack gap={2}>
+                              <Box
+                                as="span"
+                                px={3}
+                                py={1}
+                                bg={
+                                  reservation.status === "pending"
+                                    ? "orange.100"
+                                    : reservation.status === "approved"
+                                    ? "green.100"
+                                    : "red.100"
+                                }
+                                color={
+                                  reservation.status === "pending"
+                                    ? "orange.700"
+                                    : reservation.status === "approved"
+                                    ? "green.700"
+                                    : "red.700"
+                                }
+                                rounded="full"
+                                fontSize="xs"
+                                fontWeight="bold"
+                              >
+                                {reservation.status === "pending"
+                                  ? "Pending"
+                                  : reservation.status === "approved"
+                                  ? "Approved"
+                                  : "Rejected"}
+                              </Box>
+                              <Box
+                                as="span"
+                                px={3}
+                                py={1}
+                                bg="blue.100"
+                                color="blue.700"
+                                rounded="full"
+                                fontSize="xs"
+                                fontWeight="bold"
+                              >
+                                ${reservation.deposit || 100} Deposit
+                              </Box>
+                            </HStack>
+                          </Box>
+                        </Flex>
+
+                        {/* Details */}
+                        <Stack gap={2} fontSize="sm" color="gray.700">
+                          <HStack gap={2}>
+                            <Text fontWeight="semibold">📅 Date:</Text>
+                            <Text>
+                              {new Date(reservation.date).toLocaleDateString()}
+                            </Text>
+                          </HStack>
+                          <HStack gap={2}>
+                            <Text fontWeight="semibold">🕐 Time:</Text>
+                            <Text>
+                              {reservation.startTime} - {reservation.endTime}
+                            </Text>
+                          </HStack>
+                          <HStack gap={2}>
+                            <Text fontWeight="semibold">📝 Purpose:</Text>
+                            <Text>{reservation.purpose}</Text>
+                          </HStack>
+                        </Stack>
+
+                        {/* Reservation Info */}
+                        {reservation.reservedByName && (
+                          <Box
+                            p={3}
+                            bg="gray.50"
+                            rounded="md"
+                            borderWidth="1px"
+                            borderColor="gray.200"
+                          >
+                            <Text fontSize="xs" color="gray.600" mb={1}>
+                              Requested by
+                            </Text>
+                            <Text fontWeight="bold" color="navy.700">
+                              {reservation.reservedByName}
+                            </Text>
+                            <Text fontSize="sm" color="gray.600">
+                              {reservation.reservedByEmail}
+                            </Text>
+                            <Text fontSize="xs" color="gray.500" mt={1}>
+                              Payment: {reservation.paymentMethod || "Cash"}
+                            </Text>
+                            {reservation.reservedAt && (
+                              <Text fontSize="xs" color="gray.500">
+                                Requested on{" "}
+                                {new Date(
+                                  reservation.reservedAt
+                                ).toLocaleDateString()}
+                              </Text>
+                            )}
+                          </Box>
+                        )}
+
+                        {/* Actions */}
+                        <HStack gap={2} justify="flex-end" flexWrap="wrap">
+                          {reservation.status === "pending" && (
+                            <>
+                              <Button
+                                size="sm"
+                                bg="green.500"
+                                color="white"
+                                _hover={{ bg: "green.600" }}
+                                onClick={() =>
+                                  handleApproveReservation(reservation)
+                                }
+                              >
+                                Approve
+                              </Button>
+                              <Button
+                                size="sm"
+                                bg="red.500"
+                                color="white"
+                                _hover={{ bg: "red.600" }}
+                                onClick={() =>
+                                  handleRejectReservation(reservation)
+                                }
+                              >
+                                Reject
+                              </Button>
+                            </>
+                          )}
+                          {reservation.status === "approved" && (
+                            <Button
+                              size="sm"
+                              bg="orange.500"
+                              color="white"
+                              _hover={{ bg: "orange.600" }}
+                              onClick={() =>
+                                handleCancelReservation(reservation)
+                              }
+                            >
+                              Cancel
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            bg="red.500"
+                            color="white"
+                            _hover={{ bg: "red.600" }}
+                            onClick={() =>
+                              handleDeleteClubhouse(reservation.id)
+                            }
+                          >
+                            Delete
+                          </Button>
+                        </HStack>
+                      </Stack>
+                    </Box>
+                  ))}
+                </SimpleGrid>
+              )}
             </Stack>
           )}
 
@@ -2062,6 +2522,140 @@ function DashboardContent() {
                   {editingAnnouncement
                     ? "Update Announcement"
                     : "Create Announcement"}
+                </Button>
+              </HStack>
+            </Dialog.Footer>
+          </Dialog.Content>
+        </Dialog.Positioner>
+      </Dialog.Root>
+
+      {/* Clubhouse Creation/Edit Modal */}
+      <Dialog.Root
+        open={isClubhouseModalOpen}
+        onOpenChange={(e) => setIsClubhouseModalOpen(e.open)}
+        size="lg"
+      >
+        <Dialog.Backdrop />
+        <Dialog.Positioner>
+          <Dialog.Content>
+            <Dialog.Header>
+              <Dialog.Title>
+                {editingClubhouse
+                  ? "Edit Clubhouse Slot"
+                  : "Add Clubhouse Time Slot"}
+              </Dialog.Title>
+              <Dialog.CloseTrigger />
+            </Dialog.Header>
+            <Dialog.Body>
+              <Stack gap={4}>
+                <Box>
+                  <Text mb={2} fontWeight="medium">
+                    Date *
+                  </Text>
+                  <Input
+                    type="date"
+                    value={clubhouseForm.date}
+                    onChange={(e) =>
+                      setClubhouseForm({
+                        ...clubhouseForm,
+                        date: e.target.value,
+                      })
+                    }
+                  />
+                </Box>
+
+                <SimpleGrid columns={2} gap={4}>
+                  <Box>
+                    <Text mb={2} fontWeight="medium">
+                      Start Time *
+                    </Text>
+                    <Input
+                      type="time"
+                      value={clubhouseForm.startTime}
+                      onChange={(e) =>
+                        setClubhouseForm({
+                          ...clubhouseForm,
+                          startTime: e.target.value,
+                        })
+                      }
+                    />
+                  </Box>
+
+                  <Box>
+                    <Text mb={2} fontWeight="medium">
+                      End Time *
+                    </Text>
+                    <Input
+                      type="time"
+                      value={clubhouseForm.endTime}
+                      onChange={(e) =>
+                        setClubhouseForm({
+                          ...clubhouseForm,
+                          endTime: e.target.value,
+                        })
+                      }
+                    />
+                  </Box>
+                </SimpleGrid>
+
+                <Box>
+                  <Text mb={2} fontWeight="medium">
+                    Purpose
+                  </Text>
+                  <Input
+                    placeholder="e.g., General Use, Party, Meeting"
+                    value={clubhouseForm.purpose}
+                    onChange={(e) =>
+                      setClubhouseForm({
+                        ...clubhouseForm,
+                        purpose: e.target.value,
+                      })
+                    }
+                  />
+                </Box>
+
+                <Box>
+                  <Text mb={2} fontWeight="medium">
+                    Deposit Amount ($) *
+                  </Text>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="25"
+                    value={clubhouseForm.deposit}
+                    onChange={(e) =>
+                      setClubhouseForm({
+                        ...clubhouseForm,
+                        deposit: parseInt(e.target.value) || 0,
+                      })
+                    }
+                  />
+                </Box>
+
+                <Text fontSize="xs" color="gray.500">
+                  * Required fields
+                </Text>
+              </Stack>
+            </Dialog.Body>
+            <Dialog.Footer>
+              <HStack gap={3}>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsClubhouseModalOpen(false);
+                    setEditingClubhouse(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  bg="navy.600"
+                  color="white"
+                  _hover={{ bg: "navy.700" }}
+                  onClick={handleCreateClubhouse}
+                  loading={loading}
+                >
+                  {editingClubhouse ? "Update Slot" : "Create Slot"}
                 </Button>
               </HStack>
             </Dialog.Footer>
