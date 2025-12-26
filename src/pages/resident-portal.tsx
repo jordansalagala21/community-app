@@ -208,15 +208,15 @@ const EventCard = ({ event, user }: { event: EventItem; user: any }) => {
         {/* Event Details */}
         <Stack gap={2} fontSize={{ base: "xs", sm: "sm" }} color="gray.600">
           <HStack gap={2}>
-            <Text fontWeight="semibold">📅</Text>
+            <Text fontWeight="semibold">Date:</Text>
             <Text>{event.date}</Text>
           </HStack>
           <HStack gap={2}>
-            <Text fontWeight="semibold">🕐</Text>
+            <Text fontWeight="semibold">Time:</Text>
             <Text>{event.time}</Text>
           </HStack>
           <HStack gap={2}>
-            <Text fontWeight="semibold">📍</Text>
+            <Text fontWeight="semibold">Location:</Text>
             <Text>{event.location}</Text>
           </HStack>
         </Stack>
@@ -482,7 +482,9 @@ const EventCard = ({ event, user }: { event: EventItem; user: any }) => {
                     rounded="full"
                     mb={4}
                   >
-                    <Text fontSize="4xl">✅</Text>
+                    <Text fontSize="4xl" fontWeight="bold" color="green.600">
+                      ✓
+                    </Text>
                   </Box>
                   <Heading size="lg" color="green.700" mb={2}>
                     Booking Confirmed!
@@ -907,8 +909,10 @@ export default function ResidentPortal() {
                 alignItems="center"
                 justifyContent="center"
                 fontSize={{ base: "md", md: "xl" }}
+                fontWeight="bold"
+                color="navy.700"
               >
-                🏠
+                H
               </Box>
               <Heading size={{ base: "sm", md: "md" }} color="white">
                 Resident Portal
@@ -1028,8 +1032,10 @@ export default function ResidentPortal() {
                   bg="navy.100"
                   p={3}
                   rounded="xl"
+                  fontWeight="bold"
+                  color="navy.700"
                 >
-                  📢
+                  i
                 </Box>
                 <Box>
                   <Heading size={{ base: "lg", md: "xl" }} color="navy.700">
@@ -1117,7 +1123,7 @@ export default function ResidentPortal() {
 
                     <Flex align="center" gap={2} pt={2}>
                       <Text fontSize="xs" color="gray.500">
-                        📅{" "}
+                        Posted:{" "}
                         {new Date(announcement.date).toLocaleDateString(
                           "en-US",
                           {
@@ -1144,7 +1150,7 @@ export default function ResidentPortal() {
             mb={{ base: 3, md: 4 }}
             color="navy.700"
           >
-            🎫 Upcoming Events
+            Upcoming Events
           </Heading>
           <Text
             fontSize={{ base: "md", md: "lg" }}
@@ -1222,7 +1228,7 @@ export default function ResidentPortal() {
             mb={{ base: 3, md: 4 }}
             color="navy.700"
           >
-            🏠 Clubhouse Reservations
+            Clubhouse Reservations
           </Heading>
           <Text
             fontSize={{ base: "md", md: "lg" }}
@@ -1244,6 +1250,90 @@ export default function ResidentPortal() {
           >
             + Request Reservation
           </Button>
+        </Box>
+
+        {/* All Approved Reservations */}
+        <Box mb={10}>
+          <Heading size="md" color="navy.700" mb={4}>
+            Approved Reservations
+          </Heading>
+          <Text fontSize="sm" color="gray.600" mb={4}>
+            See when the clubhouse is booked to avoid scheduling conflicts
+          </Text>
+          {clubhouseReservations.filter((r) => r.status === "approved")
+            .length === 0 ? (
+            <Box
+              textAlign="center"
+              py={8}
+              bg="white"
+              rounded="xl"
+              shadow="md"
+              borderWidth="1px"
+              borderColor="gray.200"
+            >
+              <Text fontSize="md" color="gray.600">
+                No approved reservations yet. Be the first to book!
+              </Text>
+            </Box>
+          ) : (
+            <SimpleGrid
+              columns={{ base: 1, md: 2, lg: 3 }}
+              gap={{ base: 4, md: 6 }}
+            >
+              {clubhouseReservations
+                .filter((r) => r.status === "approved")
+                .sort(
+                  (a, b) =>
+                    new Date(a.date).getTime() - new Date(b.date).getTime()
+                )
+                .map((reservation) => (
+                  <Box
+                    key={reservation.id}
+                    bg="white"
+                    borderWidth="2px"
+                    borderColor="green.200"
+                    rounded="xl"
+                    shadow="lg"
+                    p={{ base: 5, md: 6 }}
+                  >
+                    <Stack gap={3}>
+                      <Flex justify="space-between" align="start">
+                        <HStack gap={2}>
+                          <Heading size="sm" color="navy.700">
+                            Reserved
+                          </Heading>
+                        </HStack>
+                        <Box
+                          as="span"
+                          px={2}
+                          py={0.5}
+                          bg="green.100"
+                          color="green.700"
+                          rounded="full"
+                          fontSize="xs"
+                          fontWeight="bold"
+                        >
+                          Booked
+                        </Box>
+                      </Flex>
+
+                      <Stack gap={2} fontSize="sm" color="gray.600">
+                        <Text fontWeight="semibold">
+                          Date:{" "}
+                          {new Date(reservation.date).toLocaleDateString()}
+                        </Text>
+                        <Text fontWeight="semibold">
+                          Time: {reservation.startTime} - {reservation.endTime}
+                        </Text>
+                        <Text fontWeight="semibold">
+                          Purpose: {reservation.purpose}
+                        </Text>
+                      </Stack>
+                    </Stack>
+                  </Box>
+                ))}
+            </SimpleGrid>
+          )}
         </Box>
 
         {/* My Reservations */}
@@ -1295,7 +1385,6 @@ export default function ResidentPortal() {
                       <Flex justify="space-between" align="start" gap={3}>
                         <Box flex="1">
                           <HStack gap={2} mb={2}>
-                            <Text fontSize="2xl">🏠</Text>
                             <Heading size="md" color="navy.700">
                               Clubhouse
                             </Heading>
@@ -1347,26 +1436,19 @@ export default function ResidentPortal() {
 
                       {/* Details */}
                       <Stack gap={2} fontSize="sm" color="gray.600">
-                        <HStack gap={2}>
-                          <Text fontWeight="semibold">📅</Text>
-                          <Text>
-                            {new Date(reservation.date).toLocaleDateString()}
-                          </Text>
-                        </HStack>
-                        <HStack gap={2}>
-                          <Text fontWeight="semibold">🕐</Text>
-                          <Text>
-                            {reservation.startTime} - {reservation.endTime}
-                          </Text>
-                        </HStack>
-                        <HStack gap={2}>
-                          <Text fontWeight="semibold">📝</Text>
-                          <Text>{reservation.purpose}</Text>
-                        </HStack>
-                        <HStack gap={2}>
-                          <Text fontWeight="semibold">💳</Text>
-                          <Text>{reservation.paymentMethod || "Cash"}</Text>
-                        </HStack>
+                        <Text fontWeight="semibold">
+                          Date:{" "}
+                          {new Date(reservation.date).toLocaleDateString()}
+                        </Text>
+                        <Text fontWeight="semibold">
+                          Time: {reservation.startTime} - {reservation.endTime}
+                        </Text>
+                        <Text fontWeight="semibold">
+                          Purpose: {reservation.purpose}
+                        </Text>
+                        <Text fontWeight="semibold">
+                          Payment: {reservation.paymentMethod || "Cash"}
+                        </Text>
                       </Stack>
 
                       {reservation.reservedAt && (
