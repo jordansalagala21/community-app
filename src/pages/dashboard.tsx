@@ -55,9 +55,9 @@ type EventItem = {
   id: string;
   title: string;
   date: string;
-  time: string;
-  startTime?: string;
-  endTime?: string;
+  time?: string;
+  startTime: string;
+  endTime: string;
   location: string;
   description: string;
   availableTickets: number;
@@ -148,7 +148,8 @@ function DashboardContent() {
   const [eventForm, setEventForm] = useState({
     title: "",
     date: "",
-    time: "",
+    startTime: "",
+    endTime: "",
     location: "",
     description: "",
     availableTickets: 0,
@@ -243,6 +244,55 @@ function DashboardContent() {
     } catch (error) {
       console.error("Error loading bookings:", error);
     }
+  };
+
+  const isEventToday = (event: EventItem) => {
+    if (!event.date) return false;
+
+    // Handle both date string formats (YYYY-MM-DD and others)
+    const eventDate = new Date(event.date + "T00:00:00");
+    const today = new Date();
+
+    eventDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+
+    return eventDate.getTime() === today.getTime();
+  };
+
+  const isEventPast = (event: EventItem) => {
+    const eventDate = new Date(event.date + "T00:00:00");
+    const now = new Date();
+
+    // If event has an end time, try to parse it and combine with date
+    if (event.endTime && event.endTime.trim()) {
+      try {
+        // Try to parse time (handles both "7:30 PM" and "19:30" formats)
+        const timeMatch = event.endTime.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+        if (timeMatch) {
+          let hours = parseInt(timeMatch[1]);
+          const minutes = parseInt(timeMatch[2]);
+          const isPM = timeMatch[3]?.toUpperCase() === "PM";
+          const isAM = timeMatch[3]?.toUpperCase() === "AM";
+
+          // Convert to 24-hour format if needed
+          if (isPM && hours !== 12) hours += 12;
+          if (isAM && hours === 12) hours = 0;
+
+          eventDate.setHours(hours, minutes, 0, 0);
+
+          // Event is past if the end time has passed
+          return eventDate < now;
+        }
+      } catch (error) {
+        // If time parsing fails, fall back to date-only comparison
+      }
+    }
+
+    // Fall back to date-only comparison (event is past if date is before today)
+    eventDate.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return eventDate < today;
   };
 
   const loadClubhouseReservations = async () => {
@@ -452,11 +502,6 @@ function DashboardContent() {
       const TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
       const PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
 
-      console.log("EmailJS Config Check:");
-      console.log("- Service ID:", SERVICE_ID ? "✓ Set" : "✗ Missing");
-      console.log("- Template ID:", TEMPLATE_ID ? "✓ Set" : "✗ Missing");
-      console.log("- Public Key:", PUBLIC_KEY ? "✓ Set" : "✗ Missing");
-
       if (!SERVICE_ID || !TEMPLATE_ID || !PUBLIC_KEY) {
         console.error(
           "EmailJS not configured properly. Please check your .env file and restart the dev server."
@@ -492,20 +537,12 @@ Welcome to our community!
         login_link: `${window.location.origin}/resident/login`,
       };
 
-      console.log("Sending email with params:", templateParams);
-      console.log("Recipient email:", resident.email);
-      console.log("Using Service ID:", SERVICE_ID);
-
       const response = await emailjs.send(
         SERVICE_ID,
         TEMPLATE_ID,
         templateParams,
         PUBLIC_KEY
       );
-
-      console.log("✓ Email sent successfully!", response);
-      console.log("Status:", response.status);
-      console.log("Text:", response.text);
     } catch (error) {
       console.error("Error sending approval email:", error);
       // Don't throw error - account is still approved even if email fails
@@ -727,9 +764,13 @@ Welcome to our community!
         <body>
           <div class="header">
             <h1>${selectedEventForAttendees.title}</h1>
-            <p><strong>Date:</strong> ${selectedEventForAttendees.date} at ${
-      selectedEventForAttendees.time
-    }</p>
+            <p><strong>Date:</strong> ${selectedEventForAttendees.date}</p>
+            <p><strong>Time:</strong> ${
+              selectedEventForAttendees.startTime &&
+              selectedEventForAttendees.endTime
+                ? `${selectedEventForAttendees.startTime} - ${selectedEventForAttendees.endTime}`
+                : selectedEventForAttendees.time || "TBD"
+            }</p>
             <p><strong>Location:</strong> ${
               selectedEventForAttendees.location
             }</p>
@@ -888,10 +929,6 @@ Welcome to our community!
       alert("Please enter an event date");
       return;
     }
-    if (!eventForm.time.trim()) {
-      alert("Please enter an event time");
-      return;
-    }
     if (!eventForm.location.trim()) {
       alert("Please enter an event location");
       return;
@@ -902,7 +939,8 @@ Welcome to our community!
       const newEvent = {
         title: eventForm.title.trim(),
         date: eventForm.date.trim(),
-        time: eventForm.time.trim(),
+        startTime: eventForm.startTime.trim(),
+        endTime: eventForm.endTime.trim(),
         location: eventForm.location.trim(),
         description: eventForm.description.trim(),
         availableTickets: eventForm.availableTickets,
@@ -929,7 +967,8 @@ Welcome to our community!
       setEventForm({
         title: "",
         date: "",
-        time: "",
+        startTime: "",
+        endTime: "",
         location: "",
         description: "",
         availableTickets: 0,
@@ -962,7 +1001,8 @@ Welcome to our community!
     setEventForm({
       title: event.title,
       date: event.date,
-      time: event.time,
+      startTime: event.startTime || event.time || "",
+      endTime: event.endTime || "",
       location: event.location,
       description: event.description,
       availableTickets: event.availableTickets,
@@ -989,7 +1029,8 @@ Welcome to our community!
     setEventForm({
       title: "",
       date: "",
-      time: "",
+      startTime: "",
+      endTime: "",
       location: "",
       description: "",
       availableTickets: 0,
@@ -1625,159 +1666,514 @@ Welcome to our community!
                 </Button>
               </Flex>
 
-              <SimpleGrid columns={{ base: 1, lg: 2, xl: 3 }} gap={6}>
-                {events.map((event) => (
-                  <Box
-                    key={event.id}
-                    bg="white"
-                    borderWidth="2px"
-                    borderColor="navy.200"
-                    rounded="xl"
-                    shadow="md"
-                    p={5}
-                    transition="all 0.2s"
-                    cursor="pointer"
-                    onClick={() => viewEventAttendees(event)}
-                    _hover={{
-                      shadow: "lg",
-                      borderColor: "navy.400",
-                      transform: "translateY(-2px)",
-                    }}
-                  >
-                    <Stack gap={3}>
-                      <Flex justify="space-between" align="start">
-                        <Heading size="sm" color="navy.700">
-                          {event.title}
-                        </Heading>
-                        <HStack gap={2}>
-                          <Box
-                            px={2}
-                            py={0.5}
-                            bg={event.isFree ? "green.100" : "blue.100"}
-                            color={event.isFree ? "green.700" : "blue.700"}
-                            rounded="full"
-                            fontSize="xs"
-                            fontWeight="bold"
-                          >
-                            {event.isFree ? "Free" : `$${event.price}`}
-                          </Box>
-                        </HStack>
-                      </Flex>
-
-                      {/* Display multiple categories */}
-                      {event.category && event.category.length > 0 && (
-                        <HStack gap={2} flexWrap="wrap">
-                          {(Array.isArray(event.category)
-                            ? event.category
-                            : [event.category]
-                          )
-                            .filter(
-                              (cat) =>
-                                typeof cat === "string" && cat.trim() !== ""
-                            )
-                            .map((cat, index) => (
-                              <Box
-                                key={`${cat}-${index}`}
-                                px={2}
-                                py={1}
-                                bg="purple.100"
-                                color="purple.700"
-                                rounded="md"
-                                fontSize="xs"
-                                fontWeight="medium"
-                              >
-                                {cat}
-                              </Box>
-                            ))}
-                        </HStack>
-                      )}
-
-                      <Stack gap={1} fontSize="sm" color="gray.600">
-                        {" "}
-                        <Text fontSize="xs" fontWeight="semibold">
-                          Date: {event.date}
-                        </Text>
-                        <Text fontSize="xs" fontWeight="semibold">
-                          Time: {event.startTime} - {event.endTime}
-                        </Text>
-                        <Text fontSize="xs" fontWeight="semibold">
-                          Location: {event.location}
-                        </Text>
-                      </Stack>
-
-                      <Text color="gray.700" fontSize="sm" lineHeight="1.5">
-                        {event.description}
-                      </Text>
-
-                      <Flex
-                        align="center"
-                        justify="space-between"
-                        p={3}
-                        bg="gray.50"
-                        rounded="lg"
-                        fontSize="sm"
+              {/* Current Events (Happening Today) */}
+              <Stack gap={4}>
+                <Heading size="md" color="green.600">
+                  Current Events (Today)
+                </Heading>
+                <SimpleGrid columns={{ base: 1, lg: 2, xl: 3 }} gap={6}>
+                  {events
+                    .filter(
+                      (event) => isEventToday(event) && !isEventPast(event)
+                    )
+                    .map((event) => (
+                      <Box
+                        key={event.id}
+                        bg="white"
+                        borderWidth="2px"
+                        borderColor="green.300"
+                        rounded="xl"
+                        shadow="md"
+                        p={5}
+                        transition="all 0.2s"
+                        cursor="pointer"
+                        onClick={() => viewEventAttendees(event)}
+                        _hover={{
+                          shadow: "lg",
+                          borderColor: "green.500",
+                          transform: "translateY(-2px)",
+                        }}
                       >
-                        <Text fontWeight="medium" color="gray.700">
-                          Available
-                        </Text>
-                        <Text
-                          fontWeight="bold"
-                          color={
-                            event.availableTickets < 10
-                              ? "red.600"
-                              : "green.600"
-                          }
-                        >
-                          {event.availableTickets} tickets
-                        </Text>
-                      </Flex>
+                        <Stack gap={3}>
+                          <Flex justify="space-between" align="start">
+                            <Heading size="sm" color="green.700">
+                              {event.title}
+                            </Heading>
+                            <HStack gap={2}>
+                              <Box
+                                px={2}
+                                py={0.5}
+                                bg="green.200"
+                                color="green.800"
+                                rounded="full"
+                                fontSize="xs"
+                                fontWeight="bold"
+                              >
+                                Live Today
+                              </Box>
+                              <Box
+                                px={2}
+                                py={0.5}
+                                bg={event.isFree ? "green.100" : "blue.100"}
+                                color={event.isFree ? "green.700" : "blue.700"}
+                                rounded="full"
+                                fontSize="xs"
+                                fontWeight="bold"
+                              >
+                                {event.isFree ? "Free" : `$${event.price}`}
+                              </Box>
+                            </HStack>
+                          </Flex>
 
-                      <HStack gap={2}>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          borderColor="navy.600"
-                          color="navy.600"
-                          flex="1"
-                          _hover={{ bg: "navy.50" }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEditEvent(event);
-                          }}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          size="sm"
-                          bg="green.500"
-                          color="white"
-                          flex="1"
-                          _hover={{ bg: "green.600" }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            viewEventAttendees(event);
-                          }}
-                        >
-                          Attendees ({getEventAttendees(event.id).length})
-                        </Button>
-                        <Button
-                          size="sm"
-                          bg="red.500"
-                          color="white"
-                          flex="1"
-                          _hover={{ bg: "red.600" }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteEvent(event.id);
-                          }}
-                        >
-                          Delete
-                        </Button>
-                      </HStack>
-                    </Stack>
+                          {/* Display multiple categories */}
+                          {event.category && event.category.length > 0 && (
+                            <HStack gap={2} flexWrap="wrap">
+                              {(Array.isArray(event.category)
+                                ? event.category
+                                : [event.category]
+                              )
+                                .filter(
+                                  (cat) =>
+                                    typeof cat === "string" && cat.trim() !== ""
+                                )
+                                .map((cat, index) => (
+                                  <Box
+                                    key={`${cat}-${index}`}
+                                    px={2}
+                                    py={1}
+                                    bg="purple.100"
+                                    color="purple.700"
+                                    rounded="md"
+                                    fontSize="xs"
+                                    fontWeight="medium"
+                                  >
+                                    {cat}
+                                  </Box>
+                                ))}
+                            </HStack>
+                          )}
+
+                          <Stack gap={1} fontSize="sm" color="gray.600">
+                            {" "}
+                            <Text fontSize="xs" fontWeight="semibold">
+                              Date: {event.date}
+                            </Text>
+                            <Text fontSize="xs" fontWeight="semibold">
+                              Time:{" "}
+                              {event.startTime && event.endTime
+                                ? `${event.startTime} - ${event.endTime}`
+                                : event.time || "TBD"}
+                            </Text>
+                            <Text fontSize="xs" fontWeight="semibold">
+                              Location: {event.location}
+                            </Text>
+                          </Stack>
+
+                          <Text color="gray.700" fontSize="sm" lineHeight="1.5">
+                            {event.description}
+                          </Text>
+
+                          <Flex
+                            align="center"
+                            justify="space-between"
+                            p={3}
+                            bg="gray.50"
+                            rounded="lg"
+                            fontSize="sm"
+                          >
+                            <Text fontWeight="medium" color="gray.700">
+                              Available
+                            </Text>
+                            <Text
+                              fontWeight="bold"
+                              color={
+                                event.availableTickets < 10
+                                  ? "red.600"
+                                  : "green.600"
+                              }
+                            >
+                              {event.availableTickets} tickets
+                            </Text>
+                          </Flex>
+
+                          <HStack gap={2}>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              borderColor="navy.600"
+                              color="navy.600"
+                              flex="1"
+                              _hover={{ bg: "navy.50" }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditEvent(event);
+                              }}
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              size="sm"
+                              bg="green.500"
+                              color="white"
+                              flex="1"
+                              _hover={{ bg: "green.600" }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                viewEventAttendees(event);
+                              }}
+                            >
+                              Attendees ({getEventAttendees(event.id).length})
+                            </Button>
+                            <Button
+                              size="sm"
+                              bg="red.500"
+                              color="white"
+                              flex="1"
+                              _hover={{ bg: "red.600" }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteEvent(event.id);
+                              }}
+                            >
+                              Delete
+                            </Button>
+                          </HStack>
+                        </Stack>
+                      </Box>
+                    ))}
+                </SimpleGrid>
+                {events.filter(
+                  (event) => isEventToday(event) && !isEventPast(event)
+                ).length === 0 && (
+                  <Box p={8} textAlign="center" bg="gray.50" rounded="lg">
+                    <Text color="gray.600">No events happening today</Text>
                   </Box>
-                ))}
-              </SimpleGrid>
+                )}
+              </Stack>
+
+              {/* Upcoming Events */}
+              <Stack gap={4}>
+                <Heading size="md" color="navy.600">
+                  Upcoming Events
+                </Heading>
+                <SimpleGrid columns={{ base: 1, lg: 2, xl: 3 }} gap={6}>
+                  {events
+                    .filter(
+                      (event) => !isEventToday(event) && !isEventPast(event)
+                    )
+                    .map((event) => (
+                      <Box
+                        key={event.id}
+                        bg="white"
+                        borderWidth="2px"
+                        borderColor="navy.200"
+                        rounded="xl"
+                        shadow="md"
+                        p={5}
+                        transition="all 0.2s"
+                        cursor="pointer"
+                        onClick={() => viewEventAttendees(event)}
+                        _hover={{
+                          shadow: "lg",
+                          borderColor: "navy.400",
+                          transform: "translateY(-2px)",
+                        }}
+                      >
+                        <Stack gap={3}>
+                          <Flex justify="space-between" align="start">
+                            <Heading size="sm" color="navy.700">
+                              {event.title}
+                            </Heading>
+                            <HStack gap={2}>
+                              <Box
+                                px={2}
+                                py={0.5}
+                                bg={event.isFree ? "green.100" : "blue.100"}
+                                color={event.isFree ? "green.700" : "blue.700"}
+                                rounded="full"
+                                fontSize="xs"
+                                fontWeight="bold"
+                              >
+                                {event.isFree ? "Free" : `$${event.price}`}
+                              </Box>
+                            </HStack>
+                          </Flex>
+
+                          {/* Display multiple categories */}
+                          {event.category && event.category.length > 0 && (
+                            <HStack gap={2} flexWrap="wrap">
+                              {(Array.isArray(event.category)
+                                ? event.category
+                                : [event.category]
+                              )
+                                .filter(
+                                  (cat) =>
+                                    typeof cat === "string" && cat.trim() !== ""
+                                )
+                                .map((cat, index) => (
+                                  <Box
+                                    key={`${cat}-${index}`}
+                                    px={2}
+                                    py={1}
+                                    bg="purple.100"
+                                    color="purple.700"
+                                    rounded="md"
+                                    fontSize="xs"
+                                    fontWeight="medium"
+                                  >
+                                    {cat}
+                                  </Box>
+                                ))}
+                            </HStack>
+                          )}
+
+                          <Stack gap={1} fontSize="sm" color="gray.600">
+                            {" "}
+                            <Text fontSize="xs" fontWeight="semibold">
+                              Date: {event.date}
+                            </Text>
+                            <Text fontSize="xs" fontWeight="semibold">
+                              Time:{" "}
+                              {event.startTime && event.endTime
+                                ? `${event.startTime} - ${event.endTime}`
+                                : event.time || "TBD"}
+                            </Text>
+                            <Text fontSize="xs" fontWeight="semibold">
+                              Location: {event.location}
+                            </Text>
+                          </Stack>
+
+                          <Text color="gray.700" fontSize="sm" lineHeight="1.5">
+                            {event.description}
+                          </Text>
+
+                          <Flex
+                            align="center"
+                            justify="space-between"
+                            p={3}
+                            bg="gray.50"
+                            rounded="lg"
+                            fontSize="sm"
+                          >
+                            <Text fontWeight="medium" color="gray.700">
+                              Available
+                            </Text>
+                            <Text
+                              fontWeight="bold"
+                              color={
+                                event.availableTickets < 10
+                                  ? "red.600"
+                                  : "green.600"
+                              }
+                            >
+                              {event.availableTickets} tickets
+                            </Text>
+                          </Flex>
+
+                          <HStack gap={2}>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              borderColor="navy.600"
+                              color="navy.600"
+                              flex="1"
+                              _hover={{ bg: "navy.50" }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditEvent(event);
+                              }}
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              size="sm"
+                              bg="green.500"
+                              color="white"
+                              flex="1"
+                              _hover={{ bg: "green.600" }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                viewEventAttendees(event);
+                              }}
+                            >
+                              Attendees ({getEventAttendees(event.id).length})
+                            </Button>
+                            <Button
+                              size="sm"
+                              bg="red.500"
+                              color="white"
+                              flex="1"
+                              _hover={{ bg: "red.600" }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteEvent(event.id);
+                              }}
+                            >
+                              Delete
+                            </Button>
+                          </HStack>
+                        </Stack>
+                      </Box>
+                    ))}
+                </SimpleGrid>
+              </Stack>
+
+              {/* Past Events */}
+              <Stack gap={4}>
+                <Heading size="md" color="gray.600">
+                  Past Events
+                </Heading>
+                <SimpleGrid columns={{ base: 1, lg: 2, xl: 3 }} gap={6}>
+                  {events
+                    .filter((event) => isEventPast(event))
+                    .map((event) => (
+                      <Box
+                        key={event.id}
+                        bg="white"
+                        borderWidth="2px"
+                        borderColor="gray.200"
+                        rounded="xl"
+                        shadow="md"
+                        p={5}
+                        opacity={0.8}
+                        transition="all 0.2s"
+                        cursor="pointer"
+                        onClick={() => viewEventAttendees(event)}
+                        _hover={{
+                          shadow: "lg",
+                          borderColor: "gray.400",
+                          transform: "translateY(-2px)",
+                        }}
+                      >
+                        <Stack gap={3}>
+                          <Flex justify="space-between" align="start">
+                            <Heading size="sm" color="gray.700">
+                              {event.title}
+                            </Heading>
+                            <HStack gap={2}>
+                              <Box
+                                px={2}
+                                py={0.5}
+                                bg="gray.200"
+                                color="gray.700"
+                                rounded="full"
+                                fontSize="xs"
+                                fontWeight="bold"
+                              >
+                                Past
+                              </Box>
+                              <Box
+                                px={2}
+                                py={0.5}
+                                bg={event.isFree ? "green.100" : "blue.100"}
+                                color={event.isFree ? "green.700" : "blue.700"}
+                                rounded="full"
+                                fontSize="xs"
+                                fontWeight="bold"
+                              >
+                                {event.isFree ? "Free" : `$${event.price}`}
+                              </Box>
+                            </HStack>
+                          </Flex>
+
+                          {/* Display multiple categories */}
+                          {event.category && event.category.length > 0 && (
+                            <HStack gap={2} flexWrap="wrap">
+                              {(Array.isArray(event.category)
+                                ? event.category
+                                : [event.category]
+                              )
+                                .filter(
+                                  (cat) =>
+                                    typeof cat === "string" && cat.trim() !== ""
+                                )
+                                .map((cat, index) => (
+                                  <Box
+                                    key={`${cat}-${index}`}
+                                    px={2}
+                                    py={1}
+                                    bg="purple.100"
+                                    color="purple.700"
+                                    rounded="md"
+                                    fontSize="xs"
+                                    fontWeight="medium"
+                                  >
+                                    {cat}
+                                  </Box>
+                                ))}
+                            </HStack>
+                          )}
+
+                          <Stack gap={1} fontSize="sm" color="gray.600">
+                            {" "}
+                            <Text fontSize="xs" fontWeight="semibold">
+                              Date: {event.date}
+                            </Text>
+                            <Text fontSize="xs" fontWeight="semibold">
+                              Time:{" "}
+                              {event.startTime && event.endTime
+                                ? `${event.startTime} - ${event.endTime}`
+                                : event.time || "TBD"}
+                            </Text>
+                            <Text fontSize="xs" fontWeight="semibold">
+                              Location: {event.location}
+                            </Text>
+                          </Stack>
+
+                          <Text color="gray.700" fontSize="sm" lineHeight="1.5">
+                            {event.description}
+                          </Text>
+
+                          <Flex
+                            align="center"
+                            justify="space-between"
+                            p={3}
+                            bg="gray.50"
+                            rounded="lg"
+                            fontSize="sm"
+                          >
+                            <Text fontWeight="medium" color="gray.700">
+                              Attendees
+                            </Text>
+                            <Text fontWeight="bold" color="gray.700">
+                              {getEventAttendees(event.id).length}
+                            </Text>
+                          </Flex>
+
+                          <HStack gap={2}>
+                            <Button
+                              size="sm"
+                              bg="green.500"
+                              color="white"
+                              flex="1"
+                              _hover={{ bg: "green.600" }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                viewEventAttendees(event);
+                              }}
+                            >
+                              View Attendees (
+                              {getEventAttendees(event.id).length})
+                            </Button>
+                            <Button
+                              size="sm"
+                              bg="red.500"
+                              color="white"
+                              flex="1"
+                              _hover={{ bg: "red.600" }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteEvent(event.id);
+                              }}
+                            >
+                              Delete
+                            </Button>
+                          </HStack>
+                        </Stack>
+                      </Box>
+                    ))}
+                </SimpleGrid>
+              </Stack>
             </Stack>
           )}
 
@@ -2526,7 +2922,10 @@ Welcome to our community!
                       Time
                     </Text>
                     <Text fontWeight="bold" color="navy.700">
-                      {selectedEventForAttendees.time}
+                      {selectedEventForAttendees.startTime &&
+                      selectedEventForAttendees.endTime
+                        ? `${selectedEventForAttendees.startTime} - ${selectedEventForAttendees.endTime}`
+                        : selectedEventForAttendees.time || "TBD"}
                     </Text>
                   </Box>
                   <Box>
@@ -2857,13 +3256,31 @@ Welcome to our community!
 
                   <Stack gap={1}>
                     <Text fontSize="sm" fontWeight="semibold">
-                      Time *
+                      Start Time
                     </Text>
                     <Input
-                      type="time"
-                      value={eventForm.time}
+                      type="text"
+                      placeholder="e.g., 7:30 PM"
+                      value={eventForm.startTime}
                       onChange={(e) =>
-                        setEventForm({ ...eventForm, time: e.target.value })
+                        setEventForm({
+                          ...eventForm,
+                          startTime: e.target.value,
+                        })
+                      }
+                    />
+                  </Stack>
+
+                  <Stack gap={1}>
+                    <Text fontSize="sm" fontWeight="semibold">
+                      End Time
+                    </Text>
+                    <Input
+                      type="text"
+                      placeholder="e.g., 9:00 PM"
+                      value={eventForm.endTime}
+                      onChange={(e) =>
+                        setEventForm({ ...eventForm, endTime: e.target.value })
                       }
                     />
                   </Stack>
