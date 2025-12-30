@@ -378,6 +378,8 @@ function DashboardContent() {
         const randomEventId =
           eventIds[Math.floor(Math.random() * eventIds.length)];
         const ticketCount = Math.floor(Math.random() * 5) + 1;
+        const randomStatus =
+          Math.random() > 0.6 ? "confirmed" : "pending payment";
 
         await addDoc(collection(db, "bookings"), {
           eventId: randomEventId,
@@ -390,7 +392,7 @@ function DashboardContent() {
           ticketCount: ticketCount,
           paymentMethod: Math.random() > 0.5 ? "cash" : "zelle",
           totalAmount: Math.floor(Math.random() * 100) + 10,
-          status: "confirmed",
+          status: randomStatus,
           bookedAt: new Date().toISOString(),
           isTestData: true,
         });
@@ -945,6 +947,71 @@ Welcome to our community!
         title: "Deletion Failed",
         description: "Failed to delete resident. Please try again.",
       });
+    }
+  };
+
+  const verifyPayment = async (booking: any) => {
+    try {
+      // Update booking status to confirmed
+      await updateDoc(doc(db, "bookings", booking.id), {
+        status: "confirmed",
+        verifiedAt: new Date().toISOString(),
+      });
+
+      // Send confirmation email
+      await sendPaymentConfirmationEmail(booking);
+
+      // Reload bookings
+      await loadBookings();
+
+      toaster.success({
+        title: "Payment Verified",
+        description: `Booking for ${booking.userName} has been confirmed and email sent.`,
+      });
+    } catch (error) {
+      console.error("Error verifying payment:", error);
+      toaster.error({
+        title: "Verification Failed",
+        description: "Failed to verify payment. Please try again.",
+      });
+    }
+  };
+
+  const sendPaymentConfirmationEmail = async (booking: any) => {
+    try {
+      const SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID;
+      const TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
+      const PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
+
+      if (!SERVICE_ID || !TEMPLATE_ID || !PUBLIC_KEY) {
+        console.error("EmailJS not configured properly.");
+        return;
+      }
+
+      const templateParams = {
+        to_email: booking.userEmail,
+        to_name: booking.userName,
+        from_name: "HOA Administration",
+        reply_to: booking.userEmail,
+        message: `
+
+Your payment has been verified and your booking is confirmed!
+
+Event: ${booking.eventTitle}
+Date: ${booking.eventDate}
+Time: ${booking.eventStartTime} - ${booking.eventEndTime}
+Tickets: ${booking.ticketCount}
+Payment Method: ${booking.paymentMethod}
+Total Amount: $${booking.totalAmount}
+
+We look forward to seeing you at the event!
+
+`,
+      };
+
+      await emailjs.send(SERVICE_ID, TEMPLATE_ID, templateParams, PUBLIC_KEY);
+    } catch (error) {
+      console.error("Error sending confirmation email:", error);
     }
   };
 
@@ -1734,6 +1801,7 @@ Welcome to our community!
                       Here's what's happening in your community today
                     </Text>
                   </Box>
+                  {/* Test Data Buttons - Hidden
                   <HStack gap={3}>
                     <Button
                       onClick={() => setIsTestDataModalOpen(true)}
@@ -1762,6 +1830,7 @@ Welcome to our community!
                       </HStack>
                     </Button>
                   </HStack>
+                  */}
                 </Flex>
               </Box>
 
@@ -4243,17 +4312,38 @@ Welcome to our community!
                                     as="span"
                                     px={2}
                                     py={1}
-                                    bg="green.100"
-                                    color="green.700"
+                                    bg={
+                                      booking.status === "confirmed"
+                                        ? "green.100"
+                                        : "orange.100"
+                                    }
+                                    color={
+                                      booking.status === "confirmed"
+                                        ? "green.700"
+                                        : "orange.700"
+                                    }
                                     rounded="full"
                                     fontSize="xs"
                                     fontWeight="bold"
                                   >
-                                    {booking.status || "Confirmed"}
+                                    {booking.status === "confirmed"
+                                      ? "Confirmed"
+                                      : "Pending Payment"}
                                   </Box>
                                 </Box>
                               </SimpleGrid>
                               <HStack gap={2} mt={3} justify="flex-end">
+                                {booking.status === "pending payment" && (
+                                  <Button
+                                    size="sm"
+                                    bg="green.500"
+                                    color="white"
+                                    _hover={{ bg: "green.600" }}
+                                    onClick={() => verifyPayment(booking)}
+                                  >
+                                    ✓ Verify Payment
+                                  </Button>
+                                )}
                                 <Button
                                   size="sm"
                                   bg="blue.500"

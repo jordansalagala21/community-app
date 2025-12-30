@@ -133,7 +133,7 @@ const EventCard = ({ event, user }: { event: EventItem; user: any }) => {
         ticketCount: ticketCount,
         paymentMethod: paymentMethod,
         totalAmount: event.isFree ? 0 : event.price * ticketCount,
-        status: "confirmed",
+        status: event.isFree ? "confirmed" : "pending payment",
         bookedAt: new Date().toISOString(),
       });
 
@@ -152,6 +152,7 @@ const EventCard = ({ event, user }: { event: EventItem; user: any }) => {
         eventEndTime: event.endTime,
         paymentMethod,
         totalAmount: event.isFree ? 0 : event.price * ticketCount,
+        isFree: event.isFree,
       });
 
       setIsBookingModalOpen(false);
@@ -275,10 +276,15 @@ const EventCard = ({ event, user }: { event: EventItem; user: any }) => {
 
         {/* Booking Section */}
         <Stack gap={3}>
-          <Flex gap={2} align="center">
+          <Flex gap={2} align="center" justify="space-between">
             <Text fontSize="sm" fontWeight="medium" color="gray.700">
               Quantity:
             </Text>
+            <Text fontSize="xs" color="gray.500">
+              (Max 5 tickets per booking)
+            </Text>
+          </Flex>
+          <Flex gap={2} align="center">
             <HStack gap={2}>
               <Button
                 size="sm"
@@ -293,9 +299,8 @@ const EventCard = ({ event, user }: { event: EventItem; user: any }) => {
                 value={ticketCount}
                 onChange={(e) => {
                   const val = parseInt(e.target.value) || 1;
-                  setTicketCount(
-                    Math.max(1, Math.min(event.availableTickets, val))
-                  );
+                  const maxAllowed = Math.min(event.availableTickets, 5);
+                  setTicketCount(Math.max(1, Math.min(maxAllowed, val)));
                 }}
                 w="60px"
                 textAlign="center"
@@ -303,11 +308,10 @@ const EventCard = ({ event, user }: { event: EventItem; user: any }) => {
               />
               <Button
                 size="sm"
-                onClick={() =>
-                  setTicketCount(
-                    Math.min(event.availableTickets, ticketCount + 1)
-                  )
-                }
+                onClick={() => {
+                  const maxAllowed = Math.min(event.availableTickets, 5);
+                  setTicketCount(Math.min(maxAllowed, ticketCount + 1));
+                }}
                 bg="gray.200"
                 color="gray.700"
                 _hover={{ bg: "gray.300" }}
@@ -520,10 +524,14 @@ const EventCard = ({ event, user }: { event: EventItem; user: any }) => {
                     </Text>
                   </Box>
                   <Heading size="lg" color="green.700" mb={2}>
-                    Booking Confirmed!
+                    {bookingDetails?.isFree
+                      ? "Booking Confirmed!"
+                      : "Booking Pending Payment"}
                   </Heading>
                   <Text color="gray.600">
-                    Your tickets have been successfully reserved
+                    {bookingDetails?.isFree
+                      ? "Your tickets have been successfully reserved"
+                      : "Please complete payment. Admin will verify and send confirmation email."}
                   </Text>
                 </Box>
 
