@@ -913,14 +913,23 @@ export default function ResidentPortal() {
     }
   };
 
+  const isEventPast = (event: EventItem) => {
+    const eventDate = new Date(event.date);
+    const today = new Date();
+    eventDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+    return eventDate < today;
+  };
+
   const filteredEvents =
     filterCategory === "All"
-      ? events
-      : events.filter((e) =>
-          Array.isArray(e.category)
+      ? events.filter((e) => !isEventPast(e))
+      : events.filter((e) => {
+          const matchesCategory = Array.isArray(e.category)
             ? e.category.includes(filterCategory)
-            : e.category === filterCategory
-        );
+            : e.category === filterCategory;
+          return !isEventPast(e) && matchesCategory;
+        });
 
   // Get user's display name or email
   const userName =

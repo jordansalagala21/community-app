@@ -43,8 +43,6 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
-  FlaskConical,
-  Trash2,
   BarChart3,
   CalendarClock,
 } from "lucide-react";
