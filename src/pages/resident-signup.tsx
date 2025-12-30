@@ -99,24 +99,32 @@ export default function ResidentSignup() {
 
       // Show pending approval message with toaster
       toaster.success({
-        title: "Account Created Successfully! 🎉",
+        title: "✅ Account Created Successfully!",
         description:
-          "Your account is pending admin approval. You will be notified via email once approved.",
-        duration: 6000,
+          "Your account is awaiting admin approval. Please do not attempt to login until you receive an approval email.",
+        duration: 8000,
       });
 
-      // Redirect after a short delay
+      // Log out the user immediately to prevent login attempts
+      await auth.signOut();
+
+      // Redirect after a longer delay to ensure message is read
       setTimeout(() => {
-        window.location.href = "/resident/login";
-      }, 2000);
+        window.location.href = "/";
+      }, 3000);
     } catch (err: any) {
+      console.error("Signup error:", err);
+
       if (err.code === "auth/email-already-in-use") {
         setError("This email is already registered. Please sign in instead.");
       } else if (err.code === "auth/invalid-email") {
         setError("Invalid email address");
       } else if (err.code === "auth/weak-password") {
         setError("Password is too weak. Please use a stronger password.");
+      } else if (err.code === "permission-denied") {
+        setError("Database permission error. Please contact administrator.");
       } else {
+        // Show full error message for debugging
         setError(err.message || "Failed to create account. Please try again.");
       }
     } finally {

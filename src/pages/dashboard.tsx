@@ -43,6 +43,10 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  FlaskConical,
+  Trash2,
+  BarChart3,
+  CalendarClock,
 } from "lucide-react";
 import emailjs from "@emailjs/browser";
 
@@ -156,10 +160,356 @@ function DashboardContent() {
     price: 0,
     category: ["Social"] as string[],
   });
+  const [isTestDataModalOpen, setIsTestDataModalOpen] = useState(false);
+  const [isGeneratingTestData, setIsGeneratingTestData] = useState(false);
+  const [isRemoveTestDataModalOpen, setIsRemoveTestDataModalOpen] =
+    useState(false);
+  const [isRemovingTestData, setIsRemovingTestData] = useState(false);
 
   const handleLogout = async () => {
     await logout();
     window.location.href = "/";
+  };
+
+  // Generate Test Data Function
+  const generateTestData = async () => {
+    try {
+      setIsGeneratingTestData(true);
+
+      const eventTitles = [
+        "Summer BBQ & Pool Party",
+        "Yoga in the Park",
+        "Movie Night: Classic Films",
+        "Kids Halloween Party",
+        "Thanksgiving Potluck Dinner",
+        "New Year's Eve Celebration",
+        "Spring Garden Workshop",
+        "Community Garage Sale",
+        "Book Club Meetup",
+        "Fitness Bootcamp",
+        "Wine Tasting Evening",
+        "Arts & Crafts Fair",
+        "Game Night: Board Games",
+        "Live Music Concert",
+        "Holiday Cookie Exchange",
+        "Pet Adoption Event",
+        "Outdoor Movie Screening",
+        "Cooking Class: Italian Cuisine",
+        "Charity 5K Run",
+        "Jazz Night",
+      ];
+
+      const locations = [
+        "Community Clubhouse",
+        "Pool Area",
+        "Main Park",
+        "Recreation Center",
+        "Tennis Courts",
+        "Community Garden",
+        "Outdoor Pavilion",
+        "Fitness Center",
+      ];
+
+      const categories = [
+        "Social",
+        "Dining",
+        "Fitness",
+        "Entertainment",
+        "Kids",
+        "Service",
+      ];
+
+      const descriptions = [
+        "Join us for an amazing community event! Bring your family and friends for a memorable experience.",
+        "Don't miss out on this exciting gathering. All residents are welcome to participate.",
+        "A wonderful opportunity to connect with your neighbors and enjoy great activities.",
+        "Come celebrate with the community! Food, fun, and entertainment for everyone.",
+        "This event promises to be unforgettable. Mark your calendars and bring your enthusiasm!",
+      ];
+
+      // Generate 15 events
+      for (let i = 0; i < 15; i++) {
+        const randomDaysAhead = Math.floor(Math.random() * 60) - 15; // -15 to 45 days
+        const eventDate = new Date();
+        eventDate.setDate(eventDate.getDate() + randomDaysAhead);
+        const dateStr = eventDate.toISOString().split("T")[0];
+
+        const isFree = Math.random() > 0.6;
+        const price = isFree ? 0 : Math.floor(Math.random() * 50) + 10;
+        const tickets = Math.floor(Math.random() * 80) + 20;
+
+        const startHour = Math.floor(Math.random() * 12) + 9; // 9 AM to 9 PM
+        const endHour = startHour + Math.floor(Math.random() * 3) + 1;
+        const startTime = `${startHour > 12 ? startHour - 12 : startHour}:00 ${
+          startHour >= 12 ? "PM" : "AM"
+        }`;
+        const endTime = `${endHour > 12 ? endHour - 12 : endHour}:00 ${
+          endHour >= 12 ? "PM" : "AM"
+        }`;
+
+        const numCategories = Math.floor(Math.random() * 2) + 1;
+        const eventCategories: string[] = [];
+        for (let j = 0; j < numCategories; j++) {
+          const cat = categories[Math.floor(Math.random() * categories.length)];
+          if (!eventCategories.includes(cat)) {
+            eventCategories.push(cat);
+          }
+        }
+
+        await addDoc(collection(db, "events"), {
+          title: eventTitles[i % eventTitles.length],
+          date: dateStr,
+          startTime: startTime,
+          endTime: endTime,
+          location: locations[Math.floor(Math.random() * locations.length)],
+          description:
+            descriptions[Math.floor(Math.random() * descriptions.length)],
+          availableTickets: tickets,
+          price: price,
+          isFree: isFree,
+          category: eventCategories,
+          isTestData: true,
+        });
+      }
+
+      // Generate 10 clubhouse reservations
+      const purposes = [
+        "Birthday Party",
+        "Family Reunion",
+        "Baby Shower",
+        "Wedding Reception",
+        "Corporate Meeting",
+        "Anniversary Celebration",
+        "Graduation Party",
+        "Game Night",
+        "Study Group",
+        "Book Club Meeting",
+      ];
+
+      const statuses = ["pending", "approved", "rejected", "completed"];
+
+      for (let i = 0; i < 10; i++) {
+        const randomDaysAhead = Math.floor(Math.random() * 40) - 10;
+        const resDate = new Date();
+        resDate.setDate(resDate.getDate() + randomDaysAhead);
+        const dateStr = resDate.toISOString().split("T")[0];
+
+        const startHour = Math.floor(Math.random() * 8) + 10; // 10 AM to 6 PM
+        const endHour = startHour + Math.floor(Math.random() * 4) + 2;
+
+        let status = statuses[Math.floor(Math.random() * statuses.length)];
+
+        // If date is in the past and status is approved, make it completed
+        const isPast = resDate < new Date();
+        if (isPast && status === "approved") {
+          status = "completed";
+        }
+
+        await addDoc(collection(db, "clubhouse"), {
+          date: dateStr,
+          startTime: `${startHour}:00`,
+          endTime: `${endHour}:00`,
+          purpose: purposes[i % purposes.length],
+          deposit: 100,
+          isAvailable: status === "rejected",
+          status: status,
+          reservedBy: `test-user-${i}`,
+          reservedByEmail: `resident${i}@test.com`,
+          reservedByName: `Test Resident ${i + 1}`,
+          reservedAt: new Date().toISOString(),
+          paymentMethod: Math.random() > 0.5 ? "cash" : "zelle",
+          isTestData: true,
+        });
+      }
+
+      // Generate 8 announcements
+      const announcementTitles = [
+        "Pool Maintenance Schedule",
+        "New Fitness Equipment Installed",
+        "Upcoming HOA Board Meeting",
+        "Parking Reminders",
+        "Holiday Office Hours",
+        "Community Clean-Up Day",
+        "Security System Upgrade",
+        "Welcome New Residents!",
+      ];
+
+      const announcementContents = [
+        "Please be aware of the upcoming maintenance schedule. We apologize for any inconvenience.",
+        "We're excited to announce this new addition to our community. Thank you for your patience.",
+        "Your participation and feedback are valuable. We look forward to seeing you there.",
+        "Please help us maintain our beautiful community by following these guidelines.",
+        "We wish everyone a wonderful time with family and friends. Stay safe!",
+        "Join us in keeping our community clean and beautiful. Your help is appreciated!",
+        "This improvement will enhance safety and security for all residents. Thank you for understanding.",
+        "Let's give a warm welcome to our new neighbors. Community is what makes us special!",
+      ];
+
+      const priorities = ["High", "Medium", "Low", "Normal"];
+
+      for (let i = 0; i < 8; i++) {
+        const randomDaysAgo = Math.floor(Math.random() * 30);
+        const annDate = new Date();
+        annDate.setDate(annDate.getDate() - randomDaysAgo);
+        const dateStr = annDate.toISOString().split("T")[0];
+
+        await addDoc(collection(db, "announcements"), {
+          title: announcementTitles[i],
+          content: announcementContents[i],
+          priority: priorities[Math.floor(Math.random() * priorities.length)],
+          date: dateStr,
+          status: "active",
+          createdAt: new Date().toISOString(),
+          isTestData: true,
+        });
+      }
+
+      // Generate some bookings for existing events (we'll use the newly created events)
+      const eventsSnapshot = await getDocs(collection(db, "events"));
+      const eventIds: string[] = [];
+      eventsSnapshot.forEach((doc) => {
+        eventIds.push(doc.id);
+      });
+
+      // Create 20 random bookings
+      for (let i = 0; i < 20; i++) {
+        if (eventIds.length === 0) break;
+
+        const randomEventId =
+          eventIds[Math.floor(Math.random() * eventIds.length)];
+        const ticketCount = Math.floor(Math.random() * 5) + 1;
+
+        await addDoc(collection(db, "bookings"), {
+          eventId: randomEventId,
+          eventTitle: "Event",
+          eventDate: new Date().toISOString().split("T")[0],
+          eventTime: "7:00 PM",
+          userId: `test-user-${i}`,
+          userEmail: `user${i}@test.com`,
+          userName: `Test User ${i + 1}`,
+          ticketCount: ticketCount,
+          paymentMethod: Math.random() > 0.5 ? "cash" : "zelle",
+          totalAmount: Math.floor(Math.random() * 100) + 10,
+          status: "confirmed",
+          bookedAt: new Date().toISOString(),
+          isTestData: true,
+        });
+      }
+
+      toaster.create({
+        title: "Test Data Generated!",
+        description:
+          "Created 15 events, 10 reservations, 8 announcements, and 20 bookings",
+        type: "success",
+        duration: 5000,
+      });
+
+      // Reload all data
+      await loadEvents();
+      await loadClubhouseReservations();
+      await loadAnnouncements();
+      await loadBookings();
+
+      setIsTestDataModalOpen(false);
+    } catch (error) {
+      console.error("Error generating test data:", error);
+      toaster.create({
+        title: "Error",
+        description: "Failed to generate test data",
+        type: "error",
+        duration: 5000,
+      });
+    } finally {
+      setIsGeneratingTestData(false);
+    }
+  };
+
+  // Remove Test Data Function
+  const removeTestData = async () => {
+    try {
+      setIsRemovingTestData(true);
+
+      let deletedCount = 0;
+
+      // Delete only test events
+      const eventsSnapshot = await getDocs(collection(db, "events"));
+      for (const eventDoc of eventsSnapshot.docs) {
+        const data = eventDoc.data();
+        if (data.isTestData === true) {
+          await deleteDoc(doc(db, "events", eventDoc.id));
+          deletedCount++;
+        }
+      }
+
+      // Delete only test clubhouse reservations
+      const clubhouseSnapshot = await getDocs(collection(db, "clubhouse"));
+      for (const clubhouseDoc of clubhouseSnapshot.docs) {
+        const data = clubhouseDoc.data();
+        if (data.isTestData === true) {
+          await deleteDoc(doc(db, "clubhouse", clubhouseDoc.id));
+          deletedCount++;
+        }
+      }
+
+      // Delete only test announcements
+      const announcementsSnapshot = await getDocs(
+        collection(db, "announcements")
+      );
+      for (const announcementDoc of announcementsSnapshot.docs) {
+        const data = announcementDoc.data();
+        if (data.isTestData === true) {
+          await deleteDoc(doc(db, "announcements", announcementDoc.id));
+          deletedCount++;
+        }
+      }
+
+      // Delete only test bookings
+      const bookingsSnapshot = await getDocs(collection(db, "bookings"));
+      for (const bookingDoc of bookingsSnapshot.docs) {
+        const data = bookingDoc.data();
+        if (data.isTestData === true) {
+          await deleteDoc(doc(db, "bookings", bookingDoc.id));
+          deletedCount++;
+        }
+      }
+
+      if (deletedCount > 0) {
+        toaster.create({
+          title: "Test Data Removed!",
+          description: `Deleted ${deletedCount} test items from the database`,
+          type: "success",
+          duration: 5000,
+        });
+      } else {
+        toaster.create({
+          title: "No Test Data Found",
+          description:
+            "There are no test items to remove. Only items created with 'Generate Test Data' can be removed.",
+          type: "info",
+          duration: 5000,
+        });
+      }
+
+      // Reload all data
+      await loadEvents();
+      await loadClubhouseReservations();
+      await loadAnnouncements();
+      await loadBookings();
+
+      setIsRemoveTestDataModalOpen(false);
+    } catch (error) {
+      console.error("Error removing test data:", error);
+      toaster.create({
+        title: "Error",
+        description: `Failed to remove test data: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`,
+        type: "error",
+        duration: 5000,
+      });
+    } finally {
+      setIsRemovingTestData(false);
+    }
   };
 
   // Load events, residents, announcements, bookings, and clubhouse from Firestore
@@ -1370,12 +1720,49 @@ Welcome to our community!
                 p={{ base: 6, md: 8 }}
                 color="white"
               >
-                <Heading size={{ base: "lg", md: "xl" }} mb={2}>
-                  Welcome back, Admin!
-                </Heading>
-                <Text fontSize={{ base: "sm", md: "md" }} opacity={0.9}>
-                  Here's what's happening in your community today
-                </Text>
+                <Flex
+                  justify="space-between"
+                  align="center"
+                  flexWrap="wrap"
+                  gap={4}
+                >
+                  <Box>
+                    <Heading size={{ base: "lg", md: "xl" }} mb={2}>
+                      Welcome back, Admin!
+                    </Heading>
+                    <Text fontSize={{ base: "sm", md: "md" }} opacity={0.9}>
+                      Here's what's happening in your community today
+                    </Text>
+                  </Box>
+                  <HStack gap={3}>
+                    <Button
+                      onClick={() => setIsTestDataModalOpen(true)}
+                      bg="orange.500"
+                      color="white"
+                      size={{ base: "sm", md: "md" }}
+                      _hover={{ bg: "orange.600" }}
+                      fontWeight="bold"
+                    >
+                      <HStack gap={2}>
+                        <Box as={FlaskConical} width="16px" height="16px" />
+                        <Text>Generate Test Data</Text>
+                      </HStack>
+                    </Button>
+                    <Button
+                      onClick={() => setIsRemoveTestDataModalOpen(true)}
+                      bg="red.500"
+                      color="white"
+                      size={{ base: "sm", md: "md" }}
+                      _hover={{ bg: "red.600" }}
+                      fontWeight="bold"
+                    >
+                      <HStack gap={2}>
+                        <Box as={Trash2} width="16px" height="16px" />
+                        <Text>Remove Test Data</Text>
+                      </HStack>
+                    </Button>
+                  </HStack>
+                </Flex>
               </Box>
 
               {/* Stats Grid */}
@@ -1466,6 +1853,613 @@ Welcome to our community!
                     </Flex>
                   </Box>
                 ))}
+              </SimpleGrid>
+
+              {/* Charts and Analytics Section */}
+              <SimpleGrid columns={{ base: 1, lg: 2 }} gap={6}>
+                {/* Event Category Distribution */}
+                <Box
+                  bg="white"
+                  rounded="2xl"
+                  shadow="lg"
+                  p={6}
+                  borderWidth="1px"
+                  borderColor="gray.100"
+                >
+                  <Heading size="md" color="navy.700" mb={5}>
+                    <HStack gap={2}>
+                      <Box as={BarChart3} width="20px" height="20px" />
+                      <Text>Events by Category</Text>
+                    </HStack>
+                  </Heading>
+                  <Stack gap={3}>
+                    {(() => {
+                      const categoryCount: Record<string, number> = {};
+                      events.forEach((event) => {
+                        if (Array.isArray(event.category)) {
+                          event.category.forEach((cat) => {
+                            categoryCount[cat] = (categoryCount[cat] || 0) + 1;
+                          });
+                        }
+                      });
+                      const total = Object.values(categoryCount).reduce(
+                        (a, b) => a + b,
+                        0
+                      );
+                      const colors = [
+                        "purple",
+                        "blue",
+                        "green",
+                        "orange",
+                        "teal",
+                        "pink",
+                      ];
+
+                      return Object.entries(categoryCount).map(
+                        ([category, count], idx) => (
+                          <Box key={category}>
+                            <Flex justify="space-between" align="center" mb={2}>
+                              <HStack gap={2}>
+                                <Box
+                                  w="3"
+                                  h="3"
+                                  rounded="full"
+                                  bg={`${colors[idx % colors.length]}.500`}
+                                />
+                                <Text
+                                  fontSize="sm"
+                                  fontWeight="medium"
+                                  color="gray.700"
+                                >
+                                  {category}
+                                </Text>
+                              </HStack>
+                              <HStack gap={3}>
+                                <Text fontSize="sm" color="gray.500">
+                                  {count} event{count !== 1 ? "s" : ""}
+                                </Text>
+                                <Text
+                                  fontSize="sm"
+                                  fontWeight="bold"
+                                  color="navy.700"
+                                >
+                                  {total > 0
+                                    ? ((count / total) * 100).toFixed(0)
+                                    : 0}
+                                  %
+                                </Text>
+                              </HStack>
+                            </Flex>
+                            <Box
+                              bg="gray.100"
+                              h="2"
+                              rounded="full"
+                              overflow="hidden"
+                            >
+                              <Box
+                                bg={`${colors[idx % colors.length]}.500`}
+                                h="full"
+                                w={
+                                  total > 0 ? `${(count / total) * 100}%` : "0%"
+                                }
+                                transition="all 0.3s"
+                              />
+                            </Box>
+                          </Box>
+                        )
+                      );
+                    })()}
+                    {events.length === 0 && (
+                      <Text
+                        fontSize="sm"
+                        color="gray.500"
+                        textAlign="center"
+                        py={4}
+                      >
+                        No events to display
+                      </Text>
+                    )}
+                  </Stack>
+                </Box>
+
+                {/* Revenue Breakdown */}
+                <Box
+                  bg="white"
+                  rounded="2xl"
+                  shadow="lg"
+                  p={6}
+                  borderWidth="1px"
+                  borderColor="gray.100"
+                >
+                  <Heading size="md" color="navy.700" mb={5}>
+                    <HStack gap={2}>
+                      <Box as={DollarSign} width="20px" height="20px" />
+                      <Text>Revenue Breakdown</Text>
+                    </HStack>
+                  </Heading>
+                  <Stack gap={4}>
+                    <Box>
+                      <Flex justify="space-between" align="center" mb={2}>
+                        <HStack gap={2}>
+                          <Box w="3" h="3" rounded="full" bg="purple.500" />
+                          <Text
+                            fontSize="sm"
+                            fontWeight="medium"
+                            color="gray.700"
+                          >
+                            Event Ticket Sales
+                          </Text>
+                        </HStack>
+                        <Text fontSize="lg" fontWeight="bold" color="navy.700">
+                          ${eventRevenue.toFixed(2)}
+                        </Text>
+                      </Flex>
+                      <Box bg="gray.100" h="3" rounded="full" overflow="hidden">
+                        <Box
+                          bg="purple.500"
+                          h="full"
+                          w={
+                            totalRevenue > 0
+                              ? `${(eventRevenue / totalRevenue) * 100}%`
+                              : "0%"
+                          }
+                          transition="all 0.3s"
+                        />
+                      </Box>
+                    </Box>
+                    <Box>
+                      <Flex justify="space-between" align="center" mb={2}>
+                        <HStack gap={2}>
+                          <Box w="3" h="3" rounded="full" bg="cyan.500" />
+                          <Text
+                            fontSize="sm"
+                            fontWeight="medium"
+                            color="gray.700"
+                          >
+                            Clubhouse Deposits
+                          </Text>
+                        </HStack>
+                        <Text fontSize="lg" fontWeight="bold" color="navy.700">
+                          ${clubhouseRevenue.toFixed(2)}
+                        </Text>
+                      </Flex>
+                      <Box bg="gray.100" h="3" rounded="full" overflow="hidden">
+                        <Box
+                          bg="cyan.500"
+                          h="full"
+                          w={
+                            totalRevenue > 0
+                              ? `${(clubhouseRevenue / totalRevenue) * 100}%`
+                              : "0%"
+                          }
+                          transition="all 0.3s"
+                        />
+                      </Box>
+                    </Box>
+                    <Box pt={3} borderTopWidth="1px" borderTopColor="gray.200">
+                      <Flex justify="space-between" align="center">
+                        <Text fontSize="md" fontWeight="bold" color="gray.700">
+                          Total Revenue
+                        </Text>
+                        <Text
+                          fontSize="2xl"
+                          fontWeight="bold"
+                          color="green.600"
+                        >
+                          ${totalRevenue.toFixed(2)}
+                        </Text>
+                      </Flex>
+                    </Box>
+                  </Stack>
+                </Box>
+
+                {/* Reservation Status */}
+                <Box
+                  bg="white"
+                  rounded="2xl"
+                  shadow="lg"
+                  p={6}
+                  borderWidth="1px"
+                  borderColor="gray.100"
+                >
+                  <Heading size="md" color="navy.700" mb={5}>
+                    <HStack gap={2}>
+                      <Box as={Building2} width="20px" height="20px" />
+                      <Text>Reservation Status</Text>
+                    </HStack>
+                  </Heading>
+                  <Stack gap={3}>
+                    <Box>
+                      <Flex justify="space-between" align="center" mb={2}>
+                        <HStack gap={2}>
+                          <Box w="3" h="3" rounded="full" bg="orange.500" />
+                          <Text
+                            fontSize="sm"
+                            fontWeight="medium"
+                            color="gray.700"
+                          >
+                            Pending
+                          </Text>
+                        </HStack>
+                        <Text fontSize="lg" fontWeight="bold" color="navy.700">
+                          {
+                            clubhouseReservations.filter(
+                              (r) => r.status === "pending"
+                            ).length
+                          }
+                        </Text>
+                      </Flex>
+                      <Box bg="gray.100" h="2" rounded="full" overflow="hidden">
+                        <Box
+                          bg="orange.500"
+                          h="full"
+                          w={
+                            clubhouseReservations.length > 0
+                              ? `${
+                                  (clubhouseReservations.filter(
+                                    (r) => r.status === "pending"
+                                  ).length /
+                                    clubhouseReservations.length) *
+                                  100
+                                }%`
+                              : "0%"
+                          }
+                          transition="all 0.3s"
+                        />
+                      </Box>
+                    </Box>
+                    <Box>
+                      <Flex justify="space-between" align="center" mb={2}>
+                        <HStack gap={2}>
+                          <Box w="3" h="3" rounded="full" bg="green.500" />
+                          <Text
+                            fontSize="sm"
+                            fontWeight="medium"
+                            color="gray.700"
+                          >
+                            Approved
+                          </Text>
+                        </HStack>
+                        <Text fontSize="lg" fontWeight="bold" color="navy.700">
+                          {
+                            clubhouseReservations.filter(
+                              (r) => r.status === "approved"
+                            ).length
+                          }
+                        </Text>
+                      </Flex>
+                      <Box bg="gray.100" h="2" rounded="full" overflow="hidden">
+                        <Box
+                          bg="green.500"
+                          h="full"
+                          w={
+                            clubhouseReservations.length > 0
+                              ? `${
+                                  (clubhouseReservations.filter(
+                                    (r) => r.status === "approved"
+                                  ).length /
+                                    clubhouseReservations.length) *
+                                  100
+                                }%`
+                              : "0%"
+                          }
+                          transition="all 0.3s"
+                        />
+                      </Box>
+                    </Box>
+                    <Box>
+                      <Flex justify="space-between" align="center" mb={2}>
+                        <HStack gap={2}>
+                          <Box w="3" h="3" rounded="full" bg="gray.500" />
+                          <Text
+                            fontSize="sm"
+                            fontWeight="medium"
+                            color="gray.700"
+                          >
+                            Completed
+                          </Text>
+                        </HStack>
+                        <Text fontSize="lg" fontWeight="bold" color="navy.700">
+                          {
+                            clubhouseReservations.filter(
+                              (r) => r.status === "completed"
+                            ).length
+                          }
+                        </Text>
+                      </Flex>
+                      <Box bg="gray.100" h="2" rounded="full" overflow="hidden">
+                        <Box
+                          bg="gray.500"
+                          h="full"
+                          w={
+                            clubhouseReservations.length > 0
+                              ? `${
+                                  (clubhouseReservations.filter(
+                                    (r) => r.status === "completed"
+                                  ).length /
+                                    clubhouseReservations.length) *
+                                  100
+                                }%`
+                              : "0%"
+                          }
+                          transition="all 0.3s"
+                        />
+                      </Box>
+                    </Box>
+                    <Box>
+                      <Flex justify="space-between" align="center" mb={2}>
+                        <HStack gap={2}>
+                          <Box w="3" h="3" rounded="full" bg="red.500" />
+                          <Text
+                            fontSize="sm"
+                            fontWeight="medium"
+                            color="gray.700"
+                          >
+                            Rejected
+                          </Text>
+                        </HStack>
+                        <Text fontSize="lg" fontWeight="bold" color="navy.700">
+                          {
+                            clubhouseReservations.filter(
+                              (r) => r.status === "rejected"
+                            ).length
+                          }
+                        </Text>
+                      </Flex>
+                      <Box bg="gray.100" h="2" rounded="full" overflow="hidden">
+                        <Box
+                          bg="red.500"
+                          h="full"
+                          w={
+                            clubhouseReservations.length > 0
+                              ? `${
+                                  (clubhouseReservations.filter(
+                                    (r) => r.status === "rejected"
+                                  ).length /
+                                    clubhouseReservations.length) *
+                                  100
+                                }%`
+                              : "0%"
+                          }
+                          transition="all 0.3s"
+                        />
+                      </Box>
+                    </Box>
+                  </Stack>
+                </Box>
+
+                {/* Upcoming Events Timeline */}
+                <Box
+                  bg="white"
+                  rounded="2xl"
+                  shadow="lg"
+                  p={6}
+                  borderWidth="1px"
+                  borderColor="gray.100"
+                >
+                  <Heading size="md" color="navy.700" mb={5}>
+                    <HStack gap={2}>
+                      <Box as={CalendarClock} width="20px" height="20px" />
+                      <Text>Upcoming Events</Text>
+                    </HStack>
+                  </Heading>
+                  <Stack gap={3} maxH="300px" overflowY="auto">
+                    {events
+                      .filter((e) => new Date(e.date) >= new Date())
+                      .sort(
+                        (a, b) =>
+                          new Date(a.date).getTime() -
+                          new Date(b.date).getTime()
+                      )
+                      .slice(0, 5)
+                      .map((event) => {
+                        const daysUntil = Math.ceil(
+                          (new Date(event.date).getTime() -
+                            new Date().getTime()) /
+                            (1000 * 60 * 60 * 24)
+                        );
+                        return (
+                          <Box
+                            key={event.id}
+                            p={3}
+                            bg="gray.50"
+                            rounded="lg"
+                            borderLeftWidth="4px"
+                            borderLeftColor="navy.500"
+                          >
+                            <Flex justify="space-between" align="start" gap={3}>
+                              <Box flex="1">
+                                <Text
+                                  fontSize="sm"
+                                  fontWeight="bold"
+                                  color="navy.700"
+                                  mb={1}
+                                >
+                                  {event.title}
+                                </Text>
+                                <Text fontSize="xs" color="gray.600">
+                                  {new Date(event.date).toLocaleDateString(
+                                    "en-US",
+                                    {
+                                      month: "short",
+                                      day: "numeric",
+                                      year: "numeric",
+                                    }
+                                  )}
+                                </Text>
+                              </Box>
+                              <Box
+                                px={2}
+                                py={1}
+                                bg={
+                                  daysUntil === 0
+                                    ? "green.100"
+                                    : daysUntil <= 3
+                                    ? "orange.100"
+                                    : "blue.100"
+                                }
+                                color={
+                                  daysUntil === 0
+                                    ? "green.700"
+                                    : daysUntil <= 3
+                                    ? "orange.700"
+                                    : "blue.700"
+                                }
+                                rounded="md"
+                                fontSize="xs"
+                                fontWeight="bold"
+                                textAlign="center"
+                                minW="60px"
+                              >
+                                {daysUntil === 0
+                                  ? "Today"
+                                  : daysUntil === 1
+                                  ? "Tomorrow"
+                                  : `${daysUntil} days`}
+                              </Box>
+                            </Flex>
+                          </Box>
+                        );
+                      })}
+                    {events.filter((e) => new Date(e.date) >= new Date())
+                      .length === 0 && (
+                      <Text
+                        fontSize="sm"
+                        color="gray.500"
+                        textAlign="center"
+                        py={4}
+                      >
+                        No upcoming events scheduled
+                      </Text>
+                    )}
+                  </Stack>
+                </Box>
+              </SimpleGrid>
+
+              {/* Additional Metrics Row */}
+              <SimpleGrid columns={{ base: 1, sm: 2, lg: 4 }} gap={5}>
+                <Box
+                  bg="white"
+                  p={5}
+                  rounded="xl"
+                  shadow="md"
+                  borderWidth="1px"
+                  borderColor="gray.100"
+                  borderLeftWidth="4px"
+                  borderLeftColor="blue.500"
+                >
+                  <Text
+                    fontSize="xs"
+                    fontWeight="semibold"
+                    color="gray.500"
+                    mb={1}
+                  >
+                    AVG TICKET PRICE
+                  </Text>
+                  <Text fontSize="2xl" fontWeight="bold" color="navy.700">
+                    $
+                    {events.filter((e) => !e.isFree).length > 0
+                      ? (
+                          events
+                            .filter((e) => !e.isFree)
+                            .reduce((sum, e) => sum + e.price, 0) /
+                          events.filter((e) => !e.isFree).length
+                        ).toFixed(2)
+                      : "0.00"}
+                  </Text>
+                  <Text fontSize="xs" color="gray.500" mt={1}>
+                    Across paid events
+                  </Text>
+                </Box>
+
+                <Box
+                  bg="white"
+                  p={5}
+                  rounded="xl"
+                  shadow="md"
+                  borderWidth="1px"
+                  borderColor="gray.100"
+                  borderLeftWidth="4px"
+                  borderLeftColor="purple.500"
+                >
+                  <Text
+                    fontSize="xs"
+                    fontWeight="semibold"
+                    color="gray.500"
+                    mb={1}
+                  >
+                    TOTAL TICKETS
+                  </Text>
+                  <Text fontSize="2xl" fontWeight="bold" color="navy.700">
+                    {bookings.reduce((sum, b) => sum + (b.ticketCount || 0), 0)}
+                  </Text>
+                  <Text fontSize="xs" color="gray.500" mt={1}>
+                    Sold across all events
+                  </Text>
+                </Box>
+
+                <Box
+                  bg="white"
+                  p={5}
+                  rounded="xl"
+                  shadow="md"
+                  borderWidth="1px"
+                  borderColor="gray.100"
+                  borderLeftWidth="4px"
+                  borderLeftColor="green.500"
+                >
+                  <Text
+                    fontSize="xs"
+                    fontWeight="semibold"
+                    color="gray.500"
+                    mb={1}
+                  >
+                    FREE EVENTS
+                  </Text>
+                  <Text fontSize="2xl" fontWeight="bold" color="navy.700">
+                    {events.filter((e) => e.isFree).length}
+                  </Text>
+                  <Text fontSize="xs" color="gray.500" mt={1}>
+                    Out of {events.length} total
+                  </Text>
+                </Box>
+
+                <Box
+                  bg="white"
+                  p={5}
+                  rounded="xl"
+                  shadow="md"
+                  borderWidth="1px"
+                  borderColor="gray.100"
+                  borderLeftWidth="4px"
+                  borderLeftColor="orange.500"
+                >
+                  <Text
+                    fontSize="xs"
+                    fontWeight="semibold"
+                    color="gray.500"
+                    mb={1}
+                  >
+                    APPROVAL RATE
+                  </Text>
+                  <Text fontSize="2xl" fontWeight="bold" color="navy.700">
+                    {clubhouseReservations.length > 0
+                      ? (
+                          (clubhouseReservations.filter(
+                            (r) =>
+                              r.status === "approved" ||
+                              r.status === "completed"
+                          ).length /
+                            clubhouseReservations.length) *
+                          100
+                        ).toFixed(0)
+                      : "0"}
+                    %
+                  </Text>
+                  <Text fontSize="xs" color="gray.500" mt={1}>
+                    For reservations
+                  </Text>
+                </Box>
               </SimpleGrid>
 
               {/* Two Column Layout */}
@@ -1665,6 +2659,88 @@ Welcome to our community!
                   + Add New Event
                 </Button>
               </Flex>
+
+              {/* Summary Cards */}
+              <SimpleGrid columns={{ base: 1, sm: 2, lg: 4 }} gap={4}>
+                <Box
+                  bg="white"
+                  p={5}
+                  rounded="xl"
+                  shadow="md"
+                  borderWidth="1px"
+                  borderColor="gray.200"
+                >
+                  <Text fontSize="sm" color="gray.600" mb={2}>
+                    Total Events
+                  </Text>
+                  <Text fontSize="3xl" fontWeight="bold" color="navy.700">
+                    {events.length}
+                  </Text>
+                </Box>
+                <Box
+                  bg="white"
+                  p={5}
+                  rounded="xl"
+                  shadow="md"
+                  borderWidth="1px"
+                  borderColor="gray.200"
+                >
+                  <Text fontSize="sm" color="gray.600" mb={2}>
+                    Current Events
+                  </Text>
+                  <Text fontSize="3xl" fontWeight="bold" color="green.600">
+                    {
+                      events.filter(
+                        (event) => isEventToday(event) && !isEventPast(event)
+                      ).length
+                    }
+                  </Text>
+                </Box>
+                <Box
+                  bg="white"
+                  p={5}
+                  rounded="xl"
+                  shadow="md"
+                  borderWidth="1px"
+                  borderColor="gray.200"
+                >
+                  <Text fontSize="sm" color="gray.600" mb={2}>
+                    Total Attendees
+                  </Text>
+                  <Text fontSize="3xl" fontWeight="bold" color="purple.600">
+                    {events.reduce(
+                      (sum, event) => sum + getEventAttendees(event.id).length,
+                      0
+                    )}
+                  </Text>
+                </Box>
+                <Box
+                  bg="white"
+                  p={5}
+                  rounded="xl"
+                  shadow="md"
+                  borderWidth="1px"
+                  borderColor="gray.200"
+                >
+                  <Text fontSize="sm" color="gray.600" mb={2}>
+                    Total Revenue
+                  </Text>
+                  <Text fontSize="3xl" fontWeight="bold" color="blue.600">
+                    $
+                    {events.reduce((sum, event) => {
+                      const eventBookings = getEventAttendees(event.id);
+                      return (
+                        sum +
+                        eventBookings.reduce(
+                          (bookingSum, booking) =>
+                            bookingSum + (booking.totalAmount || 0),
+                          0
+                        )
+                      );
+                    }, 0)}
+                  </Text>
+                </Box>
+              </SimpleGrid>
 
               {/* Current Events (Happening Today) */}
               <Stack gap={4}>
@@ -3878,6 +4954,144 @@ Welcome to our community!
                   loading={loading}
                 >
                   Save Changes
+                </Button>
+              </HStack>
+            </Dialog.Footer>
+          </Dialog.Content>
+        </Dialog.Positioner>
+      </Dialog.Root>
+
+      {/* Test Data Generation Modal */}
+      <Dialog.Root
+        open={isTestDataModalOpen}
+        onOpenChange={(e) => setIsTestDataModalOpen(e.open)}
+      >
+        <Dialog.Backdrop />
+        <Dialog.Positioner>
+          <Dialog.Content maxW="500px">
+            <Dialog.Header>
+              <Dialog.Title>Generate Test Data</Dialog.Title>
+              <Dialog.CloseTrigger />
+            </Dialog.Header>
+            <Dialog.Body>
+              <Stack gap={4}>
+                <Text fontSize="md" color="gray.700">
+                  This will create sample data for stress testing:
+                </Text>
+                <Stack gap={2} fontSize="sm" color="gray.600" pl={4}>
+                  <Text>
+                    • 15 Events (mix of free/paid, various categories & dates)
+                  </Text>
+                  <Text>• 10 Clubhouse Reservations (different statuses)</Text>
+                  <Text>• 8 Community Announcements</Text>
+                  <Text>• 20 Event Bookings</Text>
+                </Stack>
+                <Box
+                  p={4}
+                  bg="orange.50"
+                  borderWidth="1px"
+                  borderColor="orange.200"
+                  rounded="lg"
+                >
+                  <HStack gap={2} mb={2}>
+                    <Text fontSize="lg">⚠️</Text>
+                    <Text fontWeight="bold" fontSize="sm" color="orange.900">
+                      Warning
+                    </Text>
+                  </HStack>
+                  <Text fontSize="sm" color="orange.800">
+                    This will add a large amount of data to your database. Use
+                    this feature only for testing purposes.
+                  </Text>
+                </Box>
+              </Stack>
+            </Dialog.Body>
+            <Dialog.Footer>
+              <HStack gap={3}>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsTestDataModalOpen(false)}
+                  disabled={isGeneratingTestData}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  bg="orange.500"
+                  color="white"
+                  _hover={{ bg: "orange.600" }}
+                  onClick={generateTestData}
+                  loading={isGeneratingTestData}
+                >
+                  Generate Data
+                </Button>
+              </HStack>
+            </Dialog.Footer>
+          </Dialog.Content>
+        </Dialog.Positioner>
+      </Dialog.Root>
+
+      {/* Remove Test Data Modal */}
+      <Dialog.Root
+        open={isRemoveTestDataModalOpen}
+        onOpenChange={(e) => setIsRemoveTestDataModalOpen(e.open)}
+      >
+        <Dialog.Backdrop />
+        <Dialog.Positioner>
+          <Dialog.Content maxW="500px">
+            <Dialog.Header>
+              <Dialog.Title>Remove All Test Data</Dialog.Title>
+              <Dialog.CloseTrigger />
+            </Dialog.Header>
+            <Dialog.Body>
+              <Stack gap={4}>
+                <Text fontSize="md" color="gray.700">
+                  This will permanently delete only test data from your
+                  database:
+                </Text>
+                <Stack gap={2} fontSize="sm" color="gray.600" pl={4}>
+                  <Text>• Test Events (generated by test data tool)</Text>
+                  <Text>• Test Clubhouse Reservations</Text>
+                  <Text>• Test Community Announcements</Text>
+                  <Text>• Test Event Bookings</Text>
+                </Stack>
+                <Box
+                  p={4}
+                  bg="blue.50"
+                  borderWidth="1px"
+                  borderColor="blue.200"
+                  rounded="lg"
+                >
+                  <HStack gap={2} mb={2}>
+                    <Text fontSize="lg">✅</Text>
+                    <Text fontWeight="bold" fontSize="sm" color="blue.900">
+                      Your Real Data is Safe
+                    </Text>
+                  </HStack>
+                  <Text fontSize="sm" color="blue.800" fontWeight="medium">
+                    Only items created by the "Generate Test Data" button will
+                    be deleted. Your manually created events, reservations, and
+                    announcements will be preserved.
+                  </Text>
+                </Box>
+              </Stack>
+            </Dialog.Body>
+            <Dialog.Footer>
+              <HStack gap={3}>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsRemoveTestDataModalOpen(false)}
+                  disabled={isRemovingTestData}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  bg="red.600"
+                  color="white"
+                  _hover={{ bg: "red.700" }}
+                  onClick={removeTestData}
+                  loading={isRemovingTestData}
+                >
+                  Delete Test Data
                 </Button>
               </HStack>
             </Dialog.Footer>

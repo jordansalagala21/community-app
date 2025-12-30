@@ -32,7 +32,8 @@ type EventItem = {
   id: string;
   title: string;
   date: string;
-  time: string;
+  startTime: string;
+  endTime: string;
   location: string;
   description: string;
   availableTickets: number;
@@ -124,7 +125,8 @@ const EventCard = ({ event, user }: { event: EventItem; user: any }) => {
         eventId: event.id,
         eventTitle: event.title,
         eventDate: event.date,
-        eventTime: event.time,
+        eventStartTime: event.startTime,
+        eventEndTime: event.endTime,
         userId: user?.uid,
         userEmail: user?.email,
         userName: user?.displayName || user?.email?.split("@")[0] || "Guest",
@@ -146,7 +148,8 @@ const EventCard = ({ event, user }: { event: EventItem; user: any }) => {
         ticketCount,
         eventTitle: event.title,
         eventDate: event.date,
-        eventTime: event.time,
+        eventStartTime: event.startTime,
+        eventEndTime: event.endTime,
         paymentMethod,
         totalAmount: event.isFree ? 0 : event.price * ticketCount,
       });
@@ -189,8 +192,8 @@ const EventCard = ({ event, user }: { event: EventItem; user: any }) => {
                 as="span"
                 px={2}
                 py={0.5}
-                bg={event.isFree ? "green.100" : "blue.100"}
-                color={event.isFree ? "green.700" : "blue.700"}
+                bg={event.isFree ? "green.100" : "purple.100"}
+                color={event.isFree ? "green.700" : "purple.700"}
                 rounded="full"
                 fontSize="xs"
                 fontWeight="bold"
@@ -232,7 +235,9 @@ const EventCard = ({ event, user }: { event: EventItem; user: any }) => {
           </HStack>
           <HStack gap={2}>
             <Text fontWeight="semibold">Time:</Text>
-            <Text>{event.time}</Text>
+            <Text>
+              {event.startTime} - {event.endTime}
+            </Text>
           </HStack>
           <HStack gap={2}>
             <Text fontWeight="semibold">Location:</Text>
@@ -361,7 +366,7 @@ const EventCard = ({ event, user }: { event: EventItem; user: any }) => {
                     {event.title}
                   </Text>
                   <Text fontSize="sm" color="gray.600">
-                    {event.date} at {event.time}
+                    {event.date} at {event.startTime} - {event.endTime}
                   </Text>
                   <Text fontSize="sm" color="gray.600">
                     📍 {event.location}
@@ -435,18 +440,27 @@ const EventCard = ({ event, user }: { event: EventItem; user: any }) => {
                 )}
 
                 <Box
-                  p={4}
-                  bg="blue.50"
-                  borderWidth="1px"
-                  borderColor="blue.200"
-                  rounded="lg"
+                  p={5}
+                  bg="orange.50"
+                  borderWidth="2px"
+                  borderColor="orange.400"
+                  rounded="xl"
+                  shadow="md"
                 >
-                  <Text fontSize="sm" fontWeight="bold" color="blue.700" mb={1}>
-                    📸 Important Notice
-                  </Text>
-                  <Text fontSize="sm" color="gray.700">
-                    Please keep a screenshot of your payment confirmation to
-                    show at the event entrance.
+                  <HStack gap={3} mb={2} align="center">
+                    <Text fontSize="2xl">⚠️</Text>
+                    <Text fontSize="md" fontWeight="bold" color="orange.800">
+                      IMPORTANT - READ CAREFULLY
+                    </Text>
+                  </HStack>
+                  <Text
+                    fontSize="md"
+                    color="orange.900"
+                    fontWeight="medium"
+                    lineHeight="1.6"
+                  >
+                    📸 Please take a screenshot of your payment confirmation and
+                    bring it to the event entrance.
                   </Text>
                 </Box>
               </Stack>
@@ -546,7 +560,8 @@ const EventCard = ({ event, user }: { event: EventItem; user: any }) => {
                           color="gray.700"
                         >
                           {bookingDetails.eventDate} at{" "}
-                          {bookingDetails.eventTime}
+                          {bookingDetails.eventStartTime} -{" "}
+                          {bookingDetails.eventEndTime}
                         </Text>
                       </Flex>
                       <Flex justify="space-between">
@@ -598,21 +613,27 @@ const EventCard = ({ event, user }: { event: EventItem; user: any }) => {
 
                 {/* Important Notice */}
                 <Box
-                  bg="blue.50"
-                  p={4}
-                  rounded="lg"
-                  borderWidth="1px"
-                  borderColor="blue.200"
+                  p={5}
+                  bg="orange.50"
+                  borderWidth="2px"
+                  borderColor="orange.400"
+                  rounded="xl"
+                  shadow="md"
                 >
-                  <HStack gap={2} mb={2}>
-                    <Text fontSize="lg">📸</Text>
-                    <Text fontSize="sm" fontWeight="bold" color="blue.700">
-                      Important Reminder
+                  <HStack gap={3} mb={2} align="center">
+                    <Text fontSize="2xl">⚠️</Text>
+                    <Text fontSize="md" fontWeight="bold" color="orange.800">
+                      IMPORTANT - READ CAREFULLY
                     </Text>
                   </HStack>
-                  <Text fontSize="sm" color="gray.700">
-                    Please keep a screenshot of your payment confirmation to
-                    show at the event entrance.
+                  <Text
+                    fontSize="md"
+                    color="orange.900"
+                    fontWeight="medium"
+                    lineHeight="1.6"
+                  >
+                    📸 Please take a screenshot of your payment confirmation and
+                    bring it to the event entrance.
                   </Text>
                 </Box>
 

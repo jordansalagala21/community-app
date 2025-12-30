@@ -37,23 +37,47 @@ export default function ResidentLogin() {
         if (userDoc.exists()) {
           const userData = userDoc.data();
 
-          // Check if account is approved
+          // Check if account is pending approval
           if (userData.isApproved === false || userData.status === "pending") {
+            // Log the user out immediately
+            await auth.signOut();
             setError(
-              "Your account is pending admin approval. Please wait for approval before logging in."
+              "⏳ Your account is pending admin approval. You will receive an email notification once your account is approved. Please check back later."
             );
             setLoading(false);
             return;
           }
 
           // Check if account is deactivated
-          if (userData.isActive === false) {
+          if (
+            userData.status === "deactivated" ||
+            userData.isActive === false
+          ) {
+            // Log the user out immediately
+            await auth.signOut();
             setError(
-              "Your account has been deactivated. Please contact the administrator."
+              "❌ Your account has been deactivated. Please contact the administrator for assistance."
             );
             setLoading(false);
             return;
           }
+
+          // Check if account was rejected
+          if (userData.status === "rejected") {
+            // Log the user out immediately
+            await auth.signOut();
+            setError(
+              "❌ Your account registration was not approved. Please contact the administrator if you believe this is an error."
+            );
+            setLoading(false);
+            return;
+          }
+        } else {
+          // User authenticated but no Firestore document (shouldn't happen)
+          await auth.signOut();
+          setError("Account data not found. Please contact administrator.");
+          setLoading(false);
+          return;
         }
       }
 
