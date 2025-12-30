@@ -38,7 +38,7 @@ type EventItem = {
   availableTickets: number;
   price: number;
   isFree?: boolean;
-  category: string;
+  category: string[];
 };
 
 type AnnouncementItem = {
@@ -65,6 +65,14 @@ type ClubhouseReservation = {
   reservedAt?: string;
   paymentMethod?: string;
   status?: string;
+};
+
+// Helper function to check if a reservation date has passed
+const isReservationPast = (reservation: ClubhouseReservation): boolean => {
+  const reservationDate = new Date(reservation.date);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return reservationDate < today;
 };
 
 const EventCard = ({ event, user }: { event: EventItem; user: any }) => {
@@ -189,18 +197,29 @@ const EventCard = ({ event, user }: { event: EventItem; user: any }) => {
               >
                 {event.isFree ? "Free" : `$${event.price}`}
               </Box>
-              <Box
-                as="span"
-                px={2}
-                py={0.5}
-                bg="navy.100"
-                color="navy.700"
-                rounded="full"
-                fontSize="xs"
-                fontWeight="bold"
-              >
-                {event.category}
-              </Box>
+              {/* Display multiple categories */}
+              {event.category &&
+                event.category.length > 0 &&
+                (Array.isArray(event.category)
+                  ? event.category
+                  : [event.category]
+                )
+                  .filter((cat) => typeof cat === "string" && cat.trim() !== "")
+                  .map((cat, index) => (
+                    <Box
+                      key={`${cat}-${index}`}
+                      as="span"
+                      px={2}
+                      py={0.5}
+                      bg="navy.100"
+                      color="navy.700"
+                      rounded="full"
+                      fontSize="xs"
+                      fontWeight="bold"
+                    >
+                      {cat}
+                    </Box>
+                  ))}
             </HStack>
           </Box>
         </Flex>
@@ -670,7 +689,26 @@ export default function ResidentPortal() {
       const querySnapshot = await getDocs(collection(db, "events"));
       const loadedEvents: EventItem[] = [];
       querySnapshot.forEach((doc) => {
-        loadedEvents.push({ id: doc.id, ...doc.data() } as EventItem);
+        const data = doc.data();
+        // Ensure category is always an array of strings
+        let category: string[] = [];
+        if (Array.isArray(data.category)) {
+          // Filter to only include valid strings
+          category = data.category.filter(
+            (item) => typeof item === "string" && item.trim() !== ""
+          );
+        } else if (
+          typeof data.category === "string" &&
+          data.category.trim() !== ""
+        ) {
+          category = [data.category.trim()];
+        }
+
+        loadedEvents.push({
+          id: doc.id,
+          ...data,
+          category,
+        } as EventItem);
       });
       setEvents(loadedEvents);
     } catch (error) {
@@ -710,13 +748,8 @@ export default function ResidentPortal() {
           id: doc.id,
           ...doc.data(),
         } as ClubhouseReservation;
-        // Only show available slots or future reservations
-        const reservationDate = new Date(reservation.date);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        if (reservationDate >= today) {
-          loadedReservations.push(reservation);
-        }
+        // Load all reservations (including past ones for history)
+        loadedReservations.push(reservation);
       });
       // Sort by date and time
       loadedReservations.sort((a, b) => {
@@ -854,7 +887,11 @@ export default function ResidentPortal() {
   const filteredEvents =
     filterCategory === "All"
       ? events
-      : events.filter((e) => e.category === filterCategory);
+      : events.filter((e) =>
+          Array.isArray(e.category)
+            ? e.category.includes(filterCategory)
+            : e.category === filterCategory
+        );
 
   // Get user's display name or email
   const userName =
@@ -1260,8 +1297,9 @@ export default function ResidentPortal() {
           <Text fontSize="sm" color="gray.600" mb={4}>
             See when the clubhouse is booked to avoid scheduling conflicts
           </Text>
-          {clubhouseReservations.filter((r) => r.status === "approved")
-            .length === 0 ? (
+          {clubhouseReservations.filter(
+            (r) => r.status === "approved" && !isReservationPast(r)
+          ).length === 0 ? (
             <Box
               textAlign="center"
               py={8}
@@ -1281,7 +1319,7 @@ export default function ResidentPortal() {
               gap={{ base: 4, md: 6 }}
             >
               {clubhouseReservations
-                .filter((r) => r.status === "approved")
+                .filter((r) => r.status === "approved" && !isReservationPast(r))
                 .sort(
                   (a, b) =>
                     new Date(a.date).getTime() - new Date(b.date).getTime()
@@ -1341,8 +1379,12 @@ export default function ResidentPortal() {
           <Heading size="md" color="navy.700" mb={4}>
             My Reservations
           </Heading>
-          {clubhouseReservations.filter((r) => r.reservedBy === user?.uid)
-            .length === 0 ? (
+          {clubhouseReservations.filter(
+            (r) =>
+              r.reservedBy === user?.uid &&
+              r.status !== "completed" &&
+              !isReservationPast(r)
+          ).length === 0 ? (
             <Box
               textAlign="center"
               py={8}
@@ -1362,7 +1404,12 @@ export default function ResidentPortal() {
               gap={{ base: 4, md: 6 }}
             >
               {clubhouseReservations
-                .filter((r) => r.reservedBy === user?.uid)
+                .filter(
+                  (r) =>
+                    r.reservedBy === user?.uid &&
+                    r.status !== "completed" &&
+                    !isReservationPast(r)
+                )
                 .map((reservation) => (
                   <Box
                     key={reservation.id}
@@ -1371,8 +1418,12 @@ export default function ResidentPortal() {
                     borderColor={
                       reservation.status === "approved"
                         ? "green.200"
+                        : reservation.status === "completed"
+                        ? "gray.200"
                         : reservation.status === "pending"
                         ? "orange.200"
+                        : isReservationPast(reservation)
+                        ? "gray.200"
                         : "red.200"
                     }
                     rounded="xl"
@@ -1397,15 +1448,23 @@ export default function ResidentPortal() {
                               bg={
                                 reservation.status === "approved"
                                   ? "green.100"
+                                  : reservation.status === "completed"
+                                  ? "gray.100"
                                   : reservation.status === "pending"
                                   ? "orange.100"
+                                  : isReservationPast(reservation)
+                                  ? "gray.100"
                                   : "red.100"
                               }
                               color={
                                 reservation.status === "approved"
                                   ? "green.700"
+                                  : reservation.status === "completed"
+                                  ? "gray.700"
                                   : reservation.status === "pending"
                                   ? "orange.700"
+                                  : isReservationPast(reservation)
+                                  ? "gray.700"
                                   : "red.700"
                               }
                               rounded="full"
@@ -1414,9 +1473,133 @@ export default function ResidentPortal() {
                             >
                               {reservation.status === "approved"
                                 ? "Approved"
+                                : reservation.status === "completed"
+                                ? "Past"
                                 : reservation.status === "pending"
                                 ? "Pending Approval"
+                                : isReservationPast(reservation)
+                                ? "Past"
                                 : "Rejected"}
+                            </Box>
+                            <Box
+                              as="span"
+                              px={2}
+                              py={0.5}
+                              bg="blue.100"
+                              color="blue.700"
+                              rounded="full"
+                              fontSize="xs"
+                              fontWeight="bold"
+                            >
+                              ${reservation.deposit || 100} Deposit
+                            </Box>
+                          </HStack>
+                        </Box>
+                      </Flex>
+
+                      {/* Details */}
+                      <Stack gap={2} fontSize="sm" color="gray.600">
+                        <Text fontWeight="semibold">
+                          Date:{" "}
+                          {new Date(reservation.date).toLocaleDateString()}
+                        </Text>
+                        <Text fontWeight="semibold">
+                          Time: {reservation.startTime} - {reservation.endTime}
+                        </Text>
+                        <Text fontWeight="semibold">
+                          Purpose: {reservation.purpose}
+                        </Text>
+                        <Text fontWeight="semibold">
+                          Payment: {reservation.paymentMethod || "Cash"}
+                        </Text>
+                      </Stack>
+
+                      {reservation.reservedAt && (
+                        <Text fontSize="xs" color="gray.500">
+                          Requested on{" "}
+                          {new Date(
+                            reservation.reservedAt
+                          ).toLocaleDateString()}
+                        </Text>
+                      )}
+                    </Stack>
+                  </Box>
+                ))}
+            </SimpleGrid>
+          )}
+        </Box>
+
+        {/* Past Reservations */}
+        <Box>
+          <Heading size="md" color="navy.700" mb={4}>
+            Past Reservations
+          </Heading>
+          {clubhouseReservations.filter(
+            (r) =>
+              r.reservedBy === user?.uid &&
+              (r.status === "completed" || isReservationPast(r))
+          ).length === 0 ? (
+            <Box
+              textAlign="center"
+              py={8}
+              bg="white"
+              rounded="xl"
+              shadow="md"
+              borderWidth="1px"
+              borderColor="gray.200"
+            >
+              <Text fontSize="md" color="gray.600">
+                No past reservations.
+              </Text>
+            </Box>
+          ) : (
+            <SimpleGrid
+              columns={{ base: 1, md: 2, lg: 3 }}
+              gap={{ base: 4, md: 6 }}
+            >
+              {clubhouseReservations
+                .filter(
+                  (r) =>
+                    r.reservedBy === user?.uid &&
+                    (r.status === "completed" || isReservationPast(r))
+                )
+                .sort(
+                  (a, b) =>
+                    new Date(b.date).getTime() - new Date(a.date).getTime()
+                )
+                .map((reservation) => (
+                  <Box
+                    key={reservation.id}
+                    bg="white"
+                    borderWidth="2px"
+                    borderColor="gray.200"
+                    rounded="xl"
+                    shadow="lg"
+                    p={{ base: 5, md: 6 }}
+                    transition="all 0.3s"
+                    opacity={0.85}
+                  >
+                    <Stack gap={4}>
+                      {/* Header */}
+                      <Flex justify="space-between" align="start" gap={3}>
+                        <Box flex="1">
+                          <HStack gap={2} mb={2}>
+                            <Heading size="md" color="gray.700">
+                              Clubhouse
+                            </Heading>
+                          </HStack>
+                          <HStack gap={2} flexWrap="wrap">
+                            <Box
+                              as="span"
+                              px={2}
+                              py={0.5}
+                              bg="gray.100"
+                              color="gray.700"
+                              rounded="full"
+                              fontSize="xs"
+                              fontWeight="bold"
+                            >
+                              Past
                             </Box>
                             <Box
                               as="span"

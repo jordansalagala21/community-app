@@ -94,6 +94,14 @@ type ClubhouseReservation = {
 
 // Events and Announcements are now loaded from Firestore
 
+// Helper function to check if a reservation date has passed
+const isReservationPast = (reservation: ClubhouseReservation): boolean => {
+  const reservationDate = new Date(reservation.date);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return reservationDate < today;
+};
+
 function DashboardContent() {
   const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState("overview");
@@ -181,7 +189,26 @@ function DashboardContent() {
       const querySnapshot = await getDocs(collection(db, "events"));
       const loadedEvents: EventItem[] = [];
       querySnapshot.forEach((doc) => {
-        loadedEvents.push({ id: doc.id, ...doc.data() } as EventItem);
+        const data = doc.data();
+        // Ensure category is always an array of strings
+        let category: string[] = [];
+        if (Array.isArray(data.category)) {
+          // Filter to only include valid strings
+          category = data.category.filter(
+            (item) => typeof item === "string" && item.trim() !== ""
+          );
+        } else if (
+          typeof data.category === "string" &&
+          data.category.trim() !== ""
+        ) {
+          category = [data.category.trim()];
+        }
+
+        loadedEvents.push({
+          id: doc.id,
+          ...data,
+          category,
+        } as EventItem);
       });
       setEvents(loadedEvents);
     } catch (error) {
@@ -921,6 +948,17 @@ Welcome to our community!
 
   const handleEditEvent = (event: EventItem) => {
     setEditingEvent(event);
+    // Ensure category is properly formatted
+    let normalizedCategory: string[] = [];
+    if (Array.isArray(event.category)) {
+      normalizedCategory = event.category.filter(
+        (item) => typeof item === "string" && item.trim() !== ""
+      );
+    }
+    if (normalizedCategory.length === 0) {
+      normalizedCategory = ["Social"];
+    }
+
     setEventForm({
       title: event.title,
       date: event.date,
@@ -929,7 +967,7 @@ Welcome to our community!
       description: event.description,
       availableTickets: event.availableTickets,
       price: event.price,
-      category: event.category,
+      category: normalizedCategory,
     });
     setIsEventModalOpen(true);
   };
@@ -967,7 +1005,11 @@ Welcome to our community!
   }, 0);
 
   const clubhouseRevenue = clubhouseReservations
-    .filter((res) => res.status === "approved")
+    .filter((res) => {
+      // Include approved and completed reservations
+      // Completed = past approved reservations
+      return res.status === "approved" || res.status === "completed";
+    })
     .reduce((sum, res) => {
       return sum + (res.deposit || 0);
     }, 0);
@@ -1628,25 +1670,30 @@ Welcome to our community!
                           {(Array.isArray(event.category)
                             ? event.category
                             : [event.category]
-                          ).map((cat) => (
-                            <Box
-                              key={cat}
-                              px={2}
-                              py={1}
-                              bg="purple.100"
-                              color="purple.700"
-                              rounded="md"
-                              fontSize="xs"
-                              fontWeight="medium"
-                            >
-                              {cat}
-                            </Box>
-                          ))}
+                          )
+                            .filter(
+                              (cat) =>
+                                typeof cat === "string" && cat.trim() !== ""
+                            )
+                            .map((cat, index) => (
+                              <Box
+                                key={`${cat}-${index}`}
+                                px={2}
+                                py={1}
+                                bg="purple.100"
+                                color="purple.700"
+                                rounded="md"
+                                fontSize="xs"
+                                fontWeight="medium"
+                              >
+                                {cat}
+                              </Box>
+                            ))}
                         </HStack>
                       )}
 
                       <Stack gap={1} fontSize="sm" color="gray.600">
-                        \n{" "}
+                        {" "}
                         <Text fontSize="xs" fontWeight="semibold">
                           Date: {event.date}
                         </Text>
@@ -2052,6 +2099,10 @@ Welcome to our community!
                                     ? "orange.100"
                                     : reservation.status === "approved"
                                     ? "green.100"
+                                    : reservation.status === "completed"
+                                    ? "gray.100"
+                                    : isReservationPast(reservation)
+                                    ? "gray.100"
                                     : "red.100"
                                 }
                                 color={
@@ -2059,6 +2110,10 @@ Welcome to our community!
                                     ? "orange.700"
                                     : reservation.status === "approved"
                                     ? "green.700"
+                                    : reservation.status === "completed"
+                                    ? "gray.700"
+                                    : isReservationPast(reservation)
+                                    ? "gray.700"
                                     : "red.700"
                                 }
                                 rounded="full"
@@ -2069,6 +2124,10 @@ Welcome to our community!
                                   ? "Pending"
                                   : reservation.status === "approved"
                                   ? "Approved"
+                                  : reservation.status === "completed"
+                                  ? "Past"
+                                  : isReservationPast(reservation)
+                                  ? "Past"
                                   : "Rejected"}
                               </Box>
                               <Box

@@ -1,5 +1,6 @@
 // src/pages/Home.tsx
 import {
+  Badge,
   Box,
   Button,
   Container,
@@ -9,7 +10,19 @@ import {
   SimpleGrid,
   Stack,
   Text,
+  VStack,
 } from "@chakra-ui/react";
+import {
+  Home as HomeIcon,
+  Lock,
+  Info,
+  Bell,
+  Calendar,
+  Clock,
+  Star,
+  Menu,
+  Ticket,
+} from "lucide-react";
 
 type Announcement = {
   id: string;
@@ -62,14 +75,14 @@ const upcomingEvents: EventItem[] = [
 ];
 
 const FeatureCard = ({
-  icon,
+  icon: Icon,
   title,
   description,
   ctaLabel,
   to,
   variant = "outline",
 }: {
-  icon: string;
+  icon: React.ElementType;
   title: string;
   description: string;
   ctaLabel: string;
@@ -99,10 +112,10 @@ const FeatureCard = ({
         align="center"
         justify="center"
         bg={variant === "solid" ? "navy.500" : "navy.50"}
-        fontSize={{ base: "xl", md: "2xl" }}
+        color={variant === "solid" ? "white" : "navy.500"}
         mb={{ base: 3, md: 4 }}
       >
-        {icon}
+        <Icon size={24} />
       </Flex>
       <Heading
         size={{ base: "sm", md: "md" }}
@@ -141,22 +154,21 @@ export default function Home() {
   return (
     <Box bg="gray.50" minH="100vh">
       {/* NAVIGATION HEADER */}
-      <Box bg="navy.700" py={3}>
+      <Box bg="navy.700" py={4} shadow="md">
         <Container maxW="7xl" px={{ base: 4, md: 6 }}>
           <Flex justify="space-between" align="center">
-            <HStack gap={2}>
-              <Box
-                w={{ base: "32px", md: "40px" }}
-                h={{ base: "32px", md: "40px" }}
+            <HStack gap={3}>
+              <Flex
+                w={{ base: "40px", md: "48px" }}
+                h={{ base: "40px", md: "48px" }}
                 rounded="lg"
                 bg="white"
-                display="flex"
                 alignItems="center"
                 justifyContent="center"
-                fontSize={{ base: "md", md: "xl" }}
+                color="navy.600"
               >
-                🏠
-              </Box>
+                <HomeIcon size={24} />
+              </Flex>
               <Heading size={{ base: "sm", md: "md" }} color="white">
                 Community Portal
               </Heading>
@@ -167,7 +179,7 @@ export default function Home() {
               <Button
                 variant="ghost"
                 color="white"
-                size="sm"
+                size="md"
                 _hover={{ bg: "whiteAlpha.200" }}
                 onClick={() => (window.location.href = "/events")}
               >
@@ -176,35 +188,23 @@ export default function Home() {
               <Button
                 variant="ghost"
                 color="white"
-                size="sm"
+                size="md"
                 _hover={{ bg: "whiteAlpha.200" }}
                 onClick={() => (window.location.href = "/info")}
               >
                 Resources
               </Button>
-              <Button
-                bg="white"
-                color="navy.600"
-                size="sm"
-                fontWeight="bold"
-                _hover={{ bg: "whiteAlpha.900" }}
-                onClick={() => (window.location.href = "/resident/login")}
-              >
-                🔐 Sign in to Portal
-              </Button>
             </HStack>
 
-            {/* Mobile Navigation */}
+            {/* Mobile menu button */}
             <Button
               display={{ base: "flex", md: "none" }}
-              bg="white"
-              color="navy.600"
+              variant="ghost"
+              color="white"
               size="sm"
-              fontWeight="bold"
-              _hover={{ bg: "whiteAlpha.900" }}
-              onClick={() => (window.location.href = "/resident/login")}
+              _hover={{ bg: "whiteAlpha.200" }}
             >
-              🔐 Sign in
+              <Menu size={20} />
             </Button>
           </Flex>
         </Container>
@@ -214,20 +214,15 @@ export default function Home() {
       <Box
         bg="navy.600"
         color="white"
-        pt={{ base: 12, md: 16 }}
+        pt={{ base: 16, md: 20 }}
         pb={{ base: 20, md: 24 }}
       >
         <Container maxW="7xl">
-          <Stack
-            direction={{ base: "column", lg: "row" }}
-            gap={{ base: 12, lg: 16 }}
-            align="center"
-          >
-            <Box flex="1" maxW={{ lg: "600px" }}>
-              <Box
-                w="fit-content"
-                mb={5}
-                px={4}
+          <VStack gap={{ base: 12, lg: 16 }}>
+            <Box textAlign="center" maxW="4xl" mx="auto">
+              <Badge
+                mb={6}
+                px={5}
                 py={2}
                 bg="whiteAlpha.200"
                 backdropFilter="blur(10px)"
@@ -235,13 +230,14 @@ export default function Home() {
                 fontSize="sm"
                 fontWeight="semibold"
                 letterSpacing="wide"
+                color="white"
               >
                 HOA + CLUBHOUSE PORTAL
-              </Box>
+              </Badge>
               <Heading
-                size={{ base: "xl", sm: "2xl", md: "3xl" }}
+                size={{ base: "2xl", sm: "3xl", md: "4xl" }}
                 lineHeight="1.1"
-                mb={{ base: 4, md: 6 }}
+                mb={{ base: 6, md: 8 }}
                 fontWeight="800"
               >
                 Welcome to your community hub
@@ -249,68 +245,161 @@ export default function Home() {
               <Text
                 fontSize={{ base: "lg", md: "xl" }}
                 color="whiteAlpha.900"
-                mb={8}
+                mb={10}
                 lineHeight="1.8"
+                maxW="3xl"
+                mx="auto"
               >
-                Reserve the clubhouse for personal use, stay updated with
-                announcements, and register for community events—fast,
-                mobile-friendly, and organized.
+                Reserve the clubhouse, stay updated with announcements, and
+                register for community events—fast, mobile-friendly, and
+                organized.
               </Text>
 
-              <Stack direction={{ base: "column", sm: "row" }} gap={4} mb={8}>
-                <Button
-                  onClick={() => (window.location.href = "/resident-portal")}
-                  size="lg"
+              {/* Login Options Grid */}
+              <SimpleGrid
+                columns={{ base: 1, md: 2 }}
+                gap={6}
+                maxW="3xl"
+                mx="auto"
+                mb={10}
+              >
+                {/* Resident Portal */}
+                <Box
                   bg="white"
-                  color="navy.600"
-                  px={8}
-                  py={6}
-                  fontSize="md"
-                  fontWeight="bold"
+                  color="navy.700"
+                  p={8}
+                  rounded="2xl"
+                  shadow="xl"
+                  transition="all 0.3s"
                   _hover={{
-                    bg: "whiteAlpha.900",
-                    transform: "translateY(-2px)",
+                    transform: "translateY(-4px)",
+                    shadow: "2xl",
                   }}
                 >
-                  🎫 Browse Events
-                </Button>
+                  <VStack gap={4} align="stretch">
+                    <Flex
+                      w="64px"
+                      h="64px"
+                      bg="blue.500"
+                      rounded="full"
+                      align="center"
+                      justify="center"
+                      mx="auto"
+                      color="white"
+                    >
+                      <Lock size={32} />
+                    </Flex>
+                    <Heading size="md" textAlign="center">
+                      Resident Portal
+                    </Heading>
+                    <Text fontSize="sm" color="gray.600" textAlign="center">
+                      Reserve the clubhouse, register for events, and manage
+                      your account
+                    </Text>
+                    <Box h="1px" bg="gray.200" my={2} />
+                    <VStack gap={2}>
+                      <Button
+                        onClick={() =>
+                          (window.location.href = "/resident/login")
+                        }
+                        width="full"
+                        size="lg"
+                        bg="blue.500"
+                        color="white"
+                        fontWeight="bold"
+                        _hover={{
+                          bg: "blue.600",
+                        }}
+                      >
+                        Resident Sign In
+                      </Button>
+                      <Button
+                        onClick={() =>
+                          (window.location.href = "/resident/signup")
+                        }
+                        width="full"
+                        size="md"
+                        variant="ghost"
+                        color="blue.600"
+                        fontWeight="semibold"
+                      >
+                        Create Account
+                      </Button>
+                    </VStack>
+                  </VStack>
+                </Box>
 
-                <Button
-                  onClick={() => (window.location.href = "/resident/login")}
-                  size="lg"
-                  bg="transparent"
-                  color="white"
-                  borderWidth="2px"
-                  borderColor="white"
-                  px={8}
-                  py={6}
-                  fontSize="md"
-                  fontWeight="bold"
+                {/* Admin Portal */}
+                <Box
+                  bg="white"
+                  color="navy.700"
+                  p={8}
+                  rounded="2xl"
+                  shadow="xl"
+                  transition="all 0.3s"
                   _hover={{
-                    bg: "whiteAlpha.200",
+                    transform: "translateY(-4px)",
+                    shadow: "2xl",
                   }}
                 >
-                  🔒 Sign in to Reserve
-                </Button>
-              </Stack>
+                  <VStack gap={4} align="stretch">
+                    <Flex
+                      w="64px"
+                      h="64px"
+                      bg="purple.500"
+                      rounded="full"
+                      align="center"
+                      justify="center"
+                      mx="auto"
+                      color="white"
+                    >
+                      <Star size={32} />
+                    </Flex>
+                    <Heading size="md" textAlign="center">
+                      Admin Portal
+                    </Heading>
+                    <Text fontSize="sm" color="gray.600" textAlign="center">
+                      Create events, manage registrations, and check in
+                      attendees
+                    </Text>
+                    <Box h="1px" bg="gray.200" my={2} />
+                    <Button
+                      onClick={() => (window.location.href = "/admin/login")}
+                      width="full"
+                      size="lg"
+                      bg="purple.500"
+                      color="white"
+                      fontWeight="bold"
+                      _hover={{
+                        bg: "purple.600",
+                      }}
+                    >
+                      Admin Sign In
+                    </Button>
+                  </VStack>
+                </Box>
+              </SimpleGrid>
 
-              <Stack
-                direction={{ base: "column", sm: "row" }}
-                gap={{ base: 2, sm: 4, md: 6 }}
-                color="whiteAlpha.800"
-                fontSize={{ base: "xs", sm: "sm" }}
+              <HStack
+                justify="center"
+                gap={{ base: 4, sm: 8 }}
+                color="whiteAlpha.900"
+                fontSize={{ base: "sm", md: "md" }}
                 flexWrap="wrap"
               >
                 <HStack gap={2}>
-                  <Text fontWeight="medium">📅 Room calendar</Text>
+                  <Calendar size={18} />
+                  <Text fontWeight="medium">Room calendar</Text>
                 </HStack>
                 <HStack gap={2}>
-                  <Text fontWeight="medium">👥 Event management</Text>
+                  <Clock size={18} />
+                  <Text fontWeight="medium">Event management</Text>
                 </HStack>
                 <HStack gap={2}>
-                  <Text fontWeight="medium">🔔 Announcements</Text>
+                  <Bell size={18} />
+                  <Text fontWeight="medium">Announcements</Text>
                 </HStack>
-              </Stack>
+              </HStack>
             </Box>
 
             {/* Contact Card */}
@@ -326,17 +415,15 @@ export default function Home() {
             >
               <HStack gap={4} mb={6}>
                 <Flex
-                  w="48px"
-                  h="48px"
+                  w="56px"
+                  h="56px"
                   rounded="full"
                   bg="navy.500"
                   color="white"
                   alignItems="center"
                   justifyContent="center"
-                  fontWeight="bold"
-                  fontSize="xl"
                 >
-                  CO
+                  <Info size={28} />
                 </Flex>
                 <Box>
                   <Heading size="md" color="navy.700">
@@ -391,11 +478,14 @@ export default function Home() {
                     bg: "navy.100",
                   }}
                 >
-                  ℹ️ Community Info
+                  <HStack gap={2}>
+                    <Info size={18} />
+                    <Text>Community Info</Text>
+                  </HStack>
                 </Button>
               </Stack>
             </Box>
-          </Stack>
+          </VStack>
         </Container>
       </Box>
 
@@ -425,7 +515,7 @@ export default function Home() {
           gap={{ base: 4, md: 6, lg: 8 }}
         >
           <FeatureCard
-            icon="📅"
+            icon={Calendar}
             title="Reserve the clubhouse"
             description="Residents can view availability and request a private reservation."
             ctaLabel="View availability"
@@ -433,14 +523,14 @@ export default function Home() {
             variant="solid"
           />
           <FeatureCard
-            icon="🎫"
+            icon={Ticket}
             title="Register for events"
             description="No account needed to book tickets for upcoming community events."
             ctaLabel="View events"
             to="/resident-portal"
           />
           <FeatureCard
-            icon="ℹ️"
+            icon={Info}
             title="Community resources"
             description="Rules, documents, contacts, and important information for residents."
             ctaLabel="Open resources"
@@ -486,9 +576,22 @@ export default function Home() {
                 direction={{ base: "column", sm: "row" }}
                 gap={{ base: 2, sm: 0 }}
               >
-                <Heading size={{ base: "md", md: "lg" }} color="navy.700">
-                  📢 Announcements
-                </Heading>
+                <HStack gap={2}>
+                  <Flex
+                    w="40px"
+                    h="40px"
+                    rounded="full"
+                    bg="navy.50"
+                    color="navy.500"
+                    align="center"
+                    justify="center"
+                  >
+                    <Bell size={20} />
+                  </Flex>
+                  <Heading size={{ base: "md", md: "lg" }} color="navy.700">
+                    Announcements
+                  </Heading>
+                </HStack>
                 <Button
                   onClick={() => (window.location.href = "/announcements")}
                   size="sm"
@@ -580,9 +683,22 @@ export default function Home() {
                 direction={{ base: "column", sm: "row" }}
                 gap={{ base: 2, sm: 0 }}
               >
-                <Heading size={{ base: "md", md: "lg" }} color="navy.700">
-                  🎉 Upcoming events
-                </Heading>
+                <HStack gap={2}>
+                  <Flex
+                    w="40px"
+                    h="40px"
+                    rounded="full"
+                    bg="navy.50"
+                    color="navy.500"
+                    align="center"
+                    justify="center"
+                  >
+                    <Calendar size={20} />
+                  </Flex>
+                  <Heading size={{ base: "md", md: "lg" }} color="navy.700">
+                    Upcoming events
+                  </Heading>
+                </HStack>
                 <Button
                   onClick={() => (window.location.href = "/events")}
                   size="sm"
@@ -667,55 +783,7 @@ export default function Home() {
           </SimpleGrid>
         </Box>
 
-        {/* FOOTER CTA */}
-        <Box
-          mt={{ base: 10, md: 20 }}
-          mb={{ base: 8, md: 16 }}
-          p={{ base: 6, md: 12 }}
-          rounded={{ base: "2xl", md: "3xl" }}
-          bg="navy.600"
-          color="white"
-          shadow="2xl"
-        >
-          <Flex
-            direction={{ base: "column", md: "row" }}
-            align={{ base: "stretch", md: "center" }}
-            justify="space-between"
-            gap={{ base: 4, md: 6 }}
-            textAlign={{ base: "center", md: "left" }}
-          >
-            <Box>
-              <Heading
-                size={{ base: "lg", md: "xl" }}
-                mb={{ base: 2, md: 3 }}
-                fontWeight="bold"
-              >
-                Are you an event organizer?
-              </Heading>
-              <Text fontSize={{ base: "md", md: "lg" }} color="whiteAlpha.900">
-                Sign in to create events, manage registrations, and check in
-                attendees.
-              </Text>
-            </Box>
-            <Button
-              onClick={() => (window.location.href = "/admin/login")}
-              size="lg"
-              bg="white"
-              color="navy.600"
-              px={{ base: 6, md: 8 }}
-              py={6}
-              fontSize="md"
-              fontWeight="bold"
-              flexShrink={0}
-              width={{ base: "full", md: "auto" }}
-              _hover={{
-                bg: "whiteAlpha.900",
-              }}
-            >
-              👥 Organizer portal
-            </Button>
-          </Flex>
-        </Box>
+        {/* FOOTER CTA - Removed as login options are now in hero */}
       </Container>
     </Box>
   );
