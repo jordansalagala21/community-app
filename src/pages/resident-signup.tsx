@@ -27,6 +27,7 @@ export default function ResidentSignup() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -37,20 +38,36 @@ export default function ResidentSignup() {
 
     // Validation
     if (!name.trim()) {
-      setError("Please enter your name");
-      return;
-    }
-    if (!address.trim()) {
-      setError("Please enter your address");
-      return;
-    }
-    if (!address.trim()) {
-      setError("Please enter your address");
+      setError("Please enter your full name");
       return;
     }
 
     if (!email.trim()) {
-      setError("Please enter your email");
+      setError("Please enter your email address");
+      return;
+    }
+
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError("Please enter a valid email address");
+      return;
+    }
+
+    if (!phone.trim()) {
+      setError("Please enter your phone number");
+      return;
+    }
+
+    // Phone number validation (10 digits)
+    const phoneDigits = phone.replace(/\D/g, "");
+    if (phoneDigits.length !== 10) {
+      setError("Please enter a valid 10-digit phone number");
+      return;
+    }
+
+    if (!address.trim()) {
+      setError("Please enter your address");
       return;
     }
 
@@ -90,6 +107,7 @@ export default function ResidentSignup() {
       await setDoc(doc(db, "users", userCredential.user.uid), {
         name: name,
         email: email,
+        phone: phone,
         address: address,
         createdAt: new Date().toISOString(),
         role: "resident",
@@ -395,6 +413,42 @@ export default function ResidentSignup() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
+                  size="lg"
+                  borderWidth="2px"
+                  borderColor="gray.300"
+                  rounded="xl"
+                  fontSize={{ base: "md", md: "lg" }}
+                  _hover={{ borderColor: "navy.400", shadow: "sm" }}
+                  _focus={{
+                    borderColor: "navy.500",
+                    boxShadow: "0 0 0 3px var(--chakra-colors-navy-100)",
+                    transform: "scale(1.01)",
+                  }}
+                  transition="all 0.2s"
+                />
+              </Box>
+
+              <Box>
+                <Text
+                  fontSize={{ base: "xs", md: "sm" }}
+                  fontWeight="bold"
+                  mb={2}
+                  color="navy.700"
+                  textTransform="uppercase"
+                  letterSpacing="wide"
+                >
+                  Phone Number
+                </Text>
+                <Input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, "");
+                    if (value.length <= 10) {
+                      setPhone(value);
+                    }
+                  }}
+                  placeholder="(555) 123-4567"
                   size="lg"
                   borderWidth="2px"
                   borderColor="gray.300"

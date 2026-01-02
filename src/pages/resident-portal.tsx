@@ -914,10 +914,14 @@ export default function ResidentPortal() {
   };
 
   const isEventPast = (event: EventItem) => {
-    const eventDate = new Date(event.date);
+    // Parse date in local timezone by appending time
+    const eventDate = new Date(event.date + "T00:00:00");
     const today = new Date();
+
     eventDate.setHours(0, 0, 0, 0);
     today.setHours(0, 0, 0, 0);
+
+    // Event is past only if the date is before today (not today itself)
     return eventDate < today;
   };
 
