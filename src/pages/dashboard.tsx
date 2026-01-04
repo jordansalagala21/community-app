@@ -781,10 +781,15 @@ function DashboardContent() {
       await updateDoc(doc(db, "clubhouse", reservation.id), {
         status: "approved",
       });
+
+      // Send confirmation email to resident
+      await sendReservationConfirmationEmail(reservation);
+
       await loadClubhouseReservations();
       toaster.success({
         title: "Reservation Approved",
-        description: "Clubhouse reservation has been approved successfully!",
+        description:
+          "Clubhouse reservation has been approved and confirmation email sent!",
       });
     } catch (error) {
       console.error("Error approving reservation:", error);
@@ -792,6 +797,67 @@ function DashboardContent() {
         title: "Approval Failed",
         description: "Failed to approve reservation. Please try again.",
       });
+    }
+  };
+
+  const sendReservationConfirmationEmail = async (
+    reservation: ClubhouseReservation
+  ) => {
+    try {
+      const SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID;
+      const TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
+      const PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
+
+      if (!SERVICE_ID || !TEMPLATE_ID || !PUBLIC_KEY) {
+        console.error("EmailJS not configured properly.");
+        return;
+      }
+
+      const reservationDate = new Date(reservation.date).toLocaleDateString(
+        "en-US",
+        {
+          weekday: "long",
+          month: "long",
+          day: "numeric",
+          year: "numeric",
+        }
+      );
+
+      const templateParams = {
+        to_email: reservation.reservedByEmail,
+        to_name: reservation.reservedByName,
+        from_name: "HOA Administration",
+        reply_to: reservation.reservedByEmail,
+        message: `
+
+Good news! Your clubhouse reservation has been approved.
+
+RESERVATION DETAILS:
+📅 Date: ${reservationDate}
+🕐 Time: ${reservation.startTime} - ${reservation.endTime}
+📋 Purpose: ${reservation.purpose}
+💰 Deposit: $${reservation.deposit || 100}
+💳 Payment Method: ${reservation.paymentMethod || "Cash"}
+
+Please ensure:
+- Payment is completed before the reservation date
+- The clubhouse is left clean after your event
+- All community rules are followed
+
+If you need to cancel or modify your reservation, please contact the HOA administration as soon as possible.
+
+Thank you for being part of our community!
+
+`,
+        reservation_date: reservationDate,
+        reservation_time: `${reservation.startTime} - ${reservation.endTime}`,
+        reservation_purpose: reservation.purpose,
+      };
+
+      await emailjs.send(SERVICE_ID, TEMPLATE_ID, templateParams, PUBLIC_KEY);
+    } catch (error) {
+      console.error("Error sending reservation confirmation email:", error);
+      // Don't throw error - reservation is still approved even if email fails
     }
   };
 
