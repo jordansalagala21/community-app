@@ -668,6 +668,284 @@ const EventCard = ({ event, user }: { event: EventItem; user: any }) => {
   );
 };
 
+// Calendar View Component
+const CalendarView = ({
+  reservations,
+  currentMonth,
+  onMonthChange,
+  onRequestReservation,
+}: {
+  reservations: ClubhouseReservation[];
+  currentMonth: Date;
+  onMonthChange: (date: Date) => void;
+  onRequestReservation: () => void;
+}) => {
+  const getDaysInMonth = (date: Date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay();
+
+    const days: (Date | null)[] = [];
+
+    // Add empty cells for days before month starts
+    for (let i = 0; i < startingDayOfWeek; i++) {
+      days.push(null);
+    }
+
+    // Add all days in month
+    for (let day = 1; day <= daysInMonth; day++) {
+      days.push(new Date(year, month, day));
+    }
+
+    return days;
+  };
+
+  const getReservationsForDate = (date: Date | null) => {
+    if (!date) return [];
+    const dateStr = date.toISOString().split("T")[0];
+    return reservations.filter((r) => r.date === dateStr);
+  };
+
+  const goToPreviousMonth = () => {
+    const newDate = new Date(currentMonth);
+    newDate.setMonth(newDate.getMonth() - 1);
+    onMonthChange(newDate);
+  };
+
+  const goToNextMonth = () => {
+    const newDate = new Date(currentMonth);
+    newDate.setMonth(newDate.getMonth() + 1);
+    onMonthChange(newDate);
+  };
+
+  const days = getDaysInMonth(currentMonth);
+  const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+  return (
+    <Box
+      bg="white"
+      rounded="xl"
+      shadow="lg"
+      p={{ base: 4, md: 6 }}
+      borderWidth="1px"
+      borderColor="gray.200"
+    >
+      {/* Calendar Header */}
+      <Flex
+        justify="space-between"
+        align="center"
+        mb={4}
+        flexWrap="wrap"
+        gap={3}
+      >
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={goToPreviousMonth}
+          _hover={{ bg: "gray.100" }}
+        >
+          ← Previous
+        </Button>
+        <Heading size="md" color="navy.700">
+          {currentMonth.toLocaleDateString("en-US", {
+            month: "long",
+            year: "numeric",
+          })}
+        </Heading>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={goToNextMonth}
+          _hover={{ bg: "gray.100" }}
+        >
+          Next →
+        </Button>
+      </Flex>
+
+      {/* Request Reservation Button */}
+      <Flex justify="center" mb={6}>
+        <Button
+          onClick={onRequestReservation}
+          bg="navy.600"
+          color="white"
+          size="md"
+          _hover={{ bg: "navy.700" }}
+          px={6}
+        >
+          + Request Reservation
+        </Button>
+      </Flex>
+
+      {/* Weekday Headers */}
+      <SimpleGrid columns={7} gap={2} mb={2}>
+        {weekDays.map((day) => (
+          <Box
+            key={day}
+            textAlign="center"
+            fontWeight="bold"
+            fontSize="sm"
+            color="gray.600"
+            py={2}
+          >
+            {day}
+          </Box>
+        ))}
+      </SimpleGrid>
+
+      {/* Calendar Grid */}
+      <SimpleGrid columns={7} gap={2}>
+        {days.map((date, index) => {
+          const dayReservations = getReservationsForDate(date);
+          const isToday =
+            date && date.toDateString() === new Date().toDateString();
+          const isPast =
+            date && date < new Date(new Date().setHours(0, 0, 0, 0));
+
+          return (
+            <Box
+              key={index}
+              minH={{ base: "80px", md: "100px" }}
+              bg={date ? (isToday ? "blue.50" : "gray.50") : "transparent"}
+              rounded="lg"
+              p={2}
+              borderWidth={date ? "1px" : "0"}
+              borderColor={isToday ? "blue.300" : "gray.200"}
+              position="relative"
+              opacity={isPast ? 0.5 : 1}
+            >
+              {date && (
+                <>
+                  <Text
+                    fontSize="sm"
+                    fontWeight={isToday ? "bold" : "medium"}
+                    color={isToday ? "blue.700" : "gray.700"}
+                    mb={1}
+                  >
+                    {date.getDate()}
+                  </Text>
+                  {dayReservations.length > 0 && (
+                    <Stack gap={1}>
+                      {dayReservations.slice(0, 2).map((res, idx) => (
+                        <Box
+                          key={idx}
+                          bg="green.100"
+                          color="green.700"
+                          fontSize="xs"
+                          px={1.5}
+                          py={0.5}
+                          rounded="md"
+                          fontWeight="semibold"
+                          whiteSpace="nowrap"
+                          overflow="hidden"
+                          textOverflow="ellipsis"
+                          title={`${res.startTime} - ${res.endTime}: ${res.purpose}`}
+                        >
+                          {res.startTime}
+                        </Box>
+                      ))}
+                      {dayReservations.length > 2 && (
+                        <Text fontSize="xs" color="gray.600" fontWeight="bold">
+                          +{dayReservations.length - 2} more
+                        </Text>
+                      )}
+                    </Stack>
+                  )}
+                </>
+              )}
+            </Box>
+          );
+        })}
+      </SimpleGrid>
+
+      {/* Legend */}
+      <Flex gap={4} mt={4} flexWrap="wrap" justify="center">
+        <HStack gap={2} fontSize="sm">
+          <Box w={3} h={3} bg="blue.100" rounded="sm" />
+          <Text color="gray.600">Today</Text>
+        </HStack>
+        <HStack gap={2} fontSize="sm">
+          <Box w={3} h={3} bg="green.100" rounded="sm" />
+          <Text color="gray.600">Reserved</Text>
+        </HStack>
+      </Flex>
+
+      {/* Reservations List for Selected Month */}
+      {reservations.filter((r) => {
+        const resDate = new Date(r.date);
+        return (
+          resDate.getMonth() === currentMonth.getMonth() &&
+          resDate.getFullYear() === currentMonth.getFullYear()
+        );
+      }).length > 0 && (
+        <Box mt={6} pt={6} borderTopWidth="1px" borderColor="gray.200">
+          <Heading size="sm" color="navy.700" mb={4}>
+            Reservations This Month
+          </Heading>
+          <Stack gap={3}>
+            {reservations
+              .filter((r) => {
+                const resDate = new Date(r.date);
+                return (
+                  resDate.getMonth() === currentMonth.getMonth() &&
+                  resDate.getFullYear() === currentMonth.getFullYear()
+                );
+              })
+              .sort(
+                (a, b) =>
+                  new Date(a.date).getTime() - new Date(b.date).getTime()
+              )
+              .map((res) => (
+                <Flex
+                  key={res.id}
+                  gap={3}
+                  p={3}
+                  bg="gray.50"
+                  rounded="lg"
+                  borderWidth="1px"
+                  borderColor="gray.200"
+                  align="center"
+                  flexWrap="wrap"
+                >
+                  <Box flex="1" minW="150px">
+                    <Text fontSize="sm" fontWeight="bold" color="navy.700">
+                      {new Date(res.date).toLocaleDateString("en-US", {
+                        weekday: "short",
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </Text>
+                    <Text fontSize="xs" color="gray.600">
+                      {res.startTime} - {res.endTime}
+                    </Text>
+                  </Box>
+                  <Box flex="2" minW="200px">
+                    <Text fontSize="sm" color="gray.700">
+                      {res.purpose}
+                    </Text>
+                  </Box>
+                  <Box
+                    px={2}
+                    py={1}
+                    bg="green.100"
+                    color="green.700"
+                    rounded="full"
+                    fontSize="xs"
+                    fontWeight="bold"
+                  >
+                    Booked
+                  </Box>
+                </Flex>
+              ))}
+          </Stack>
+        </Box>
+      )}
+    </Box>
+  );
+};
+
 export default function ResidentPortal() {
   const [filterCategory, setFilterCategory] = useState<string>("All");
   const [events, setEvents] = useState<EventItem[]>([]);
@@ -678,6 +956,10 @@ export default function ResidentPortal() {
   const [isClubhouseModalOpen, setIsClubhouseModalOpen] = useState(false);
   const [clubhousePaymentMethod, setClubhousePaymentMethod] = useState("cash");
   const [isBookingClubhouse, setIsBookingClubhouse] = useState(false);
+  const [clubhouseViewMode, setClubhouseViewMode] = useState<
+    "list" | "calendar"
+  >("list");
+  const [currentMonth, setCurrentMonth] = useState(new Date());
   const [clubhouseForm, setClubhouseForm] = useState({
     date: "",
     startTime: "",
@@ -1318,378 +1600,437 @@ export default function ResidentPortal() {
           >
             Reserve the clubhouse for your private events
           </Text>
-          <Button
-            onClick={() => setIsClubhouseModalOpen(true)}
-            size="lg"
-            bg="navy.600"
-            color="white"
-            _hover={{ bg: "navy.700" }}
-            px={8}
-            mt={4}
-          >
-            + Request Reservation
-          </Button>
-        </Box>
-
-        {/* All Approved Reservations */}
-        <Box mb={10}>
-          <Heading size="md" color="navy.700" mb={4}>
-            Approved Reservations
-          </Heading>
-          <Text fontSize="sm" color="gray.600" mb={4}>
-            See when the clubhouse is booked to avoid scheduling conflicts
-          </Text>
-          {clubhouseReservations.filter(
-            (r) => r.status === "approved" && !isReservationPast(r)
-          ).length === 0 ? (
-            <Box
-              textAlign="center"
-              py={8}
+          <HStack justify="center" gap={4} mt={4}>
+            <Button
+              onClick={() => setIsClubhouseModalOpen(true)}
+              size="lg"
+              bg="navy.600"
+              color="white"
+              _hover={{ bg: "navy.700" }}
+              px={8}
+            >
+              + Request Reservation
+            </Button>
+            <HStack
               bg="white"
-              rounded="xl"
-              shadow="md"
+              rounded="lg"
+              p={1}
+              shadow="sm"
               borderWidth="1px"
               borderColor="gray.200"
             >
-              <Text fontSize="md" color="gray.600">
-                No approved reservations yet. Be the first to book!
-              </Text>
-            </Box>
-          ) : (
-            <SimpleGrid
-              columns={{ base: 1, md: 2, lg: 3 }}
-              gap={{ base: 4, md: 6 }}
-            >
-              {clubhouseReservations
-                .filter((r) => r.status === "approved" && !isReservationPast(r))
-                .sort(
-                  (a, b) =>
-                    new Date(a.date).getTime() - new Date(b.date).getTime()
-                )
-                .map((reservation) => (
-                  <Box
-                    key={reservation.id}
-                    bg="white"
-                    borderWidth="2px"
-                    borderColor="green.200"
-                    rounded="xl"
-                    shadow="lg"
-                    p={{ base: 5, md: 6 }}
-                  >
-                    <Stack gap={3}>
-                      <Flex justify="space-between" align="start">
-                        <HStack gap={2}>
-                          <Heading size="sm" color="navy.700">
-                            Reserved
-                          </Heading>
-                        </HStack>
-                        <Box
-                          as="span"
-                          px={2}
-                          py={0.5}
-                          bg="green.100"
-                          color="green.700"
-                          rounded="full"
-                          fontSize="xs"
-                          fontWeight="bold"
-                        >
-                          Booked
-                        </Box>
-                      </Flex>
-
-                      <Stack gap={2} fontSize="sm" color="gray.600">
-                        <Text fontWeight="semibold">
-                          Date:{" "}
-                          {new Date(reservation.date).toLocaleDateString()}
-                        </Text>
-                        <Text fontWeight="semibold">
-                          Time: {reservation.startTime} - {reservation.endTime}
-                        </Text>
-                        <Text fontWeight="semibold">
-                          Purpose: {reservation.purpose}
-                        </Text>
-                      </Stack>
-                    </Stack>
-                  </Box>
-                ))}
-            </SimpleGrid>
-          )}
+              <Button
+                size="md"
+                bg={clubhouseViewMode === "list" ? "navy.600" : "transparent"}
+                color={clubhouseViewMode === "list" ? "white" : "gray.600"}
+                _hover={{
+                  bg: clubhouseViewMode === "list" ? "navy.700" : "gray.100",
+                }}
+                onClick={() => setClubhouseViewMode("list")}
+              >
+                📋 List
+              </Button>
+              <Button
+                size="md"
+                bg={
+                  clubhouseViewMode === "calendar" ? "navy.600" : "transparent"
+                }
+                color={clubhouseViewMode === "calendar" ? "white" : "gray.600"}
+                _hover={{
+                  bg:
+                    clubhouseViewMode === "calendar" ? "navy.700" : "gray.100",
+                }}
+                onClick={() => setClubhouseViewMode("calendar")}
+              >
+                📅 Calendar
+              </Button>
+            </HStack>
+          </HStack>
         </Box>
 
-        {/* My Reservations */}
-        <Box>
-          <Heading size="md" color="navy.700" mb={4}>
-            My Reservations
-          </Heading>
-          {clubhouseReservations.filter(
-            (r) =>
-              r.reservedBy === user?.uid &&
-              r.status !== "completed" &&
-              !isReservationPast(r)
-          ).length === 0 ? (
-            <Box
-              textAlign="center"
-              py={8}
-              bg="white"
-              rounded="xl"
-              shadow="md"
-              borderWidth="1px"
-              borderColor="gray.200"
-            >
-              <Text fontSize="md" color="gray.600">
-                You haven't made any reservations yet.
+        {/* Calendar View */}
+        {clubhouseViewMode === "calendar" && (
+          <Box mb={10}>
+            <CalendarView
+              reservations={clubhouseReservations.filter(
+                (r) => r.status === "approved" && !isReservationPast(r)
+              )}
+              currentMonth={currentMonth}
+              onMonthChange={setCurrentMonth}
+              onRequestReservation={() => setIsClubhouseModalOpen(true)}
+            />
+          </Box>
+        )}
+
+        {/* List View */}
+        {clubhouseViewMode === "list" && (
+          <>
+            {/* All Approved Reservations */}
+            <Box mb={10}>
+              <Heading size="md" color="navy.700" mb={4}>
+                Approved Reservations
+              </Heading>
+              <Text fontSize="sm" color="gray.600" mb={4}>
+                See when the clubhouse is booked to avoid scheduling conflicts
               </Text>
+              {clubhouseReservations.filter(
+                (r) => r.status === "approved" && !isReservationPast(r)
+              ).length === 0 ? (
+                <Box
+                  textAlign="center"
+                  py={8}
+                  bg="white"
+                  rounded="xl"
+                  shadow="md"
+                  borderWidth="1px"
+                  borderColor="gray.200"
+                >
+                  <Text fontSize="md" color="gray.600">
+                    No approved reservations yet. Be the first to book!
+                  </Text>
+                </Box>
+              ) : (
+                <SimpleGrid
+                  columns={{ base: 1, md: 2, lg: 3 }}
+                  gap={{ base: 4, md: 6 }}
+                >
+                  {clubhouseReservations
+                    .filter(
+                      (r) => r.status === "approved" && !isReservationPast(r)
+                    )
+                    .sort(
+                      (a, b) =>
+                        new Date(a.date).getTime() - new Date(b.date).getTime()
+                    )
+                    .map((reservation) => (
+                      <Box
+                        key={reservation.id}
+                        bg="white"
+                        borderWidth="2px"
+                        borderColor="green.200"
+                        rounded="xl"
+                        shadow="lg"
+                        p={{ base: 5, md: 6 }}
+                      >
+                        <Stack gap={3}>
+                          <Flex justify="space-between" align="start">
+                            <HStack gap={2}>
+                              <Heading size="sm" color="navy.700">
+                                Reserved
+                              </Heading>
+                            </HStack>
+                            <Box
+                              as="span"
+                              px={2}
+                              py={0.5}
+                              bg="green.100"
+                              color="green.700"
+                              rounded="full"
+                              fontSize="xs"
+                              fontWeight="bold"
+                            >
+                              Booked
+                            </Box>
+                          </Flex>
+
+                          <Stack gap={2} fontSize="sm" color="gray.600">
+                            <Text fontWeight="semibold">
+                              Date:{" "}
+                              {new Date(reservation.date).toLocaleDateString()}
+                            </Text>
+                            <Text fontWeight="semibold">
+                              Time: {reservation.startTime} -{" "}
+                              {reservation.endTime}
+                            </Text>
+                            <Text fontWeight="semibold">
+                              Purpose: {reservation.purpose}
+                            </Text>
+                          </Stack>
+                        </Stack>
+                      </Box>
+                    ))}
+                </SimpleGrid>
+              )}
             </Box>
-          ) : (
-            <SimpleGrid
-              columns={{ base: 1, md: 2, lg: 3 }}
-              gap={{ base: 4, md: 6 }}
-            >
-              {clubhouseReservations
-                .filter(
-                  (r) =>
-                    r.reservedBy === user?.uid &&
-                    r.status !== "completed" &&
-                    !isReservationPast(r)
-                )
-                .map((reservation) => (
-                  <Box
-                    key={reservation.id}
-                    bg="white"
-                    borderWidth="2px"
-                    borderColor={
-                      reservation.status === "approved"
-                        ? "green.200"
-                        : reservation.status === "completed"
-                        ? "gray.200"
-                        : reservation.status === "pending"
-                        ? "orange.200"
-                        : isReservationPast(reservation)
-                        ? "gray.200"
-                        : "red.200"
-                    }
-                    rounded="xl"
-                    shadow="lg"
-                    p={{ base: 5, md: 6 }}
-                    transition="all 0.3s"
-                  >
-                    <Stack gap={4}>
-                      {/* Header */}
-                      <Flex justify="space-between" align="start" gap={3}>
-                        <Box flex="1">
-                          <HStack gap={2} mb={2}>
-                            <Heading size="md" color="navy.700">
-                              Clubhouse
-                            </Heading>
-                          </HStack>
-                          <HStack gap={2} flexWrap="wrap">
-                            <Box
-                              as="span"
-                              px={2}
-                              py={0.5}
-                              bg={
-                                reservation.status === "approved"
-                                  ? "green.100"
-                                  : reservation.status === "completed"
-                                  ? "gray.100"
-                                  : reservation.status === "pending"
-                                  ? "orange.100"
-                                  : isReservationPast(reservation)
-                                  ? "gray.100"
-                                  : "red.100"
-                              }
-                              color={
-                                reservation.status === "approved"
-                                  ? "green.700"
-                                  : reservation.status === "completed"
-                                  ? "gray.700"
-                                  : reservation.status === "pending"
-                                  ? "orange.700"
-                                  : isReservationPast(reservation)
-                                  ? "gray.700"
-                                  : "red.700"
-                              }
-                              rounded="full"
-                              fontSize="xs"
-                              fontWeight="bold"
-                            >
-                              {reservation.status === "approved"
-                                ? "Approved"
-                                : reservation.status === "completed"
-                                ? "Past"
-                                : reservation.status === "pending"
-                                ? "Pending Approval"
-                                : isReservationPast(reservation)
-                                ? "Past"
-                                : "Rejected"}
+
+            {/* My Reservations */}
+            <Box>
+              <Heading size="md" color="navy.700" mb={4}>
+                My Reservations
+              </Heading>
+              {clubhouseReservations.filter(
+                (r) =>
+                  r.reservedBy === user?.uid &&
+                  r.status !== "completed" &&
+                  !isReservationPast(r)
+              ).length === 0 ? (
+                <Box
+                  textAlign="center"
+                  py={8}
+                  bg="white"
+                  rounded="xl"
+                  shadow="md"
+                  borderWidth="1px"
+                  borderColor="gray.200"
+                >
+                  <Text fontSize="md" color="gray.600">
+                    You haven't made any reservations yet.
+                  </Text>
+                </Box>
+              ) : (
+                <SimpleGrid
+                  columns={{ base: 1, md: 2, lg: 3 }}
+                  gap={{ base: 4, md: 6 }}
+                >
+                  {clubhouseReservations
+                    .filter(
+                      (r) =>
+                        r.reservedBy === user?.uid &&
+                        r.status !== "completed" &&
+                        !isReservationPast(r)
+                    )
+                    .map((reservation) => (
+                      <Box
+                        key={reservation.id}
+                        bg="white"
+                        borderWidth="2px"
+                        borderColor={
+                          reservation.status === "approved"
+                            ? "green.200"
+                            : reservation.status === "completed"
+                            ? "gray.200"
+                            : reservation.status === "pending"
+                            ? "orange.200"
+                            : isReservationPast(reservation)
+                            ? "gray.200"
+                            : "red.200"
+                        }
+                        rounded="xl"
+                        shadow="lg"
+                        p={{ base: 5, md: 6 }}
+                        transition="all 0.3s"
+                      >
+                        <Stack gap={4}>
+                          {/* Header */}
+                          <Flex justify="space-between" align="start" gap={3}>
+                            <Box flex="1">
+                              <HStack gap={2} mb={2}>
+                                <Heading size="md" color="navy.700">
+                                  Clubhouse
+                                </Heading>
+                              </HStack>
+                              <HStack gap={2} flexWrap="wrap">
+                                <Box
+                                  as="span"
+                                  px={2}
+                                  py={0.5}
+                                  bg={
+                                    reservation.status === "approved"
+                                      ? "green.100"
+                                      : reservation.status === "completed"
+                                      ? "gray.100"
+                                      : reservation.status === "pending"
+                                      ? "orange.100"
+                                      : isReservationPast(reservation)
+                                      ? "gray.100"
+                                      : "red.100"
+                                  }
+                                  color={
+                                    reservation.status === "approved"
+                                      ? "green.700"
+                                      : reservation.status === "completed"
+                                      ? "gray.700"
+                                      : reservation.status === "pending"
+                                      ? "orange.700"
+                                      : isReservationPast(reservation)
+                                      ? "gray.700"
+                                      : "red.700"
+                                  }
+                                  rounded="full"
+                                  fontSize="xs"
+                                  fontWeight="bold"
+                                >
+                                  {reservation.status === "approved"
+                                    ? "Approved"
+                                    : reservation.status === "completed"
+                                    ? "Past"
+                                    : reservation.status === "pending"
+                                    ? "Pending Approval"
+                                    : isReservationPast(reservation)
+                                    ? "Past"
+                                    : "Rejected"}
+                                </Box>
+                                <Box
+                                  as="span"
+                                  px={2}
+                                  py={0.5}
+                                  bg="blue.100"
+                                  color="blue.700"
+                                  rounded="full"
+                                  fontSize="xs"
+                                  fontWeight="bold"
+                                >
+                                  ${reservation.deposit || 100} Deposit
+                                </Box>
+                              </HStack>
                             </Box>
-                            <Box
-                              as="span"
-                              px={2}
-                              py={0.5}
-                              bg="blue.100"
-                              color="blue.700"
-                              rounded="full"
-                              fontSize="xs"
-                              fontWeight="bold"
-                            >
-                              ${reservation.deposit || 100} Deposit
-                            </Box>
-                          </HStack>
-                        </Box>
-                      </Flex>
+                          </Flex>
 
-                      {/* Details */}
-                      <Stack gap={2} fontSize="sm" color="gray.600">
-                        <Text fontWeight="semibold">
-                          Date:{" "}
-                          {new Date(reservation.date).toLocaleDateString()}
-                        </Text>
-                        <Text fontWeight="semibold">
-                          Time: {reservation.startTime} - {reservation.endTime}
-                        </Text>
-                        <Text fontWeight="semibold">
-                          Purpose: {reservation.purpose}
-                        </Text>
-                        <Text fontWeight="semibold">
-                          Payment: {reservation.paymentMethod || "Cash"}
-                        </Text>
-                      </Stack>
+                          {/* Details */}
+                          <Stack gap={2} fontSize="sm" color="gray.600">
+                            <Text fontWeight="semibold">
+                              Date:{" "}
+                              {new Date(reservation.date).toLocaleDateString()}
+                            </Text>
+                            <Text fontWeight="semibold">
+                              Time: {reservation.startTime} -{" "}
+                              {reservation.endTime}
+                            </Text>
+                            <Text fontWeight="semibold">
+                              Purpose: {reservation.purpose}
+                            </Text>
+                            <Text fontWeight="semibold">
+                              Payment: {reservation.paymentMethod || "Cash"}
+                            </Text>
+                          </Stack>
 
-                      {reservation.reservedAt && (
-                        <Text fontSize="xs" color="gray.500">
-                          Requested on{" "}
-                          {new Date(
-                            reservation.reservedAt
-                          ).toLocaleDateString()}
-                        </Text>
-                      )}
-                    </Stack>
-                  </Box>
-                ))}
-            </SimpleGrid>
-          )}
-        </Box>
-
-        {/* Past Reservations */}
-        <Box>
-          <Heading size="md" color="navy.700" mb={4}>
-            Past Reservations
-          </Heading>
-          {clubhouseReservations.filter(
-            (r) =>
-              r.reservedBy === user?.uid &&
-              (r.status === "completed" || isReservationPast(r))
-          ).length === 0 ? (
-            <Box
-              textAlign="center"
-              py={8}
-              bg="white"
-              rounded="xl"
-              shadow="md"
-              borderWidth="1px"
-              borderColor="gray.200"
-            >
-              <Text fontSize="md" color="gray.600">
-                No past reservations.
-              </Text>
+                          {reservation.reservedAt && (
+                            <Text fontSize="xs" color="gray.500">
+                              Requested on{" "}
+                              {new Date(
+                                reservation.reservedAt
+                              ).toLocaleDateString()}
+                            </Text>
+                          )}
+                        </Stack>
+                      </Box>
+                    ))}
+                </SimpleGrid>
+              )}
             </Box>
-          ) : (
-            <SimpleGrid
-              columns={{ base: 1, md: 2, lg: 3 }}
-              gap={{ base: 4, md: 6 }}
-            >
-              {clubhouseReservations
-                .filter(
-                  (r) =>
-                    r.reservedBy === user?.uid &&
-                    (r.status === "completed" || isReservationPast(r))
-                )
-                .sort(
-                  (a, b) =>
-                    new Date(b.date).getTime() - new Date(a.date).getTime()
-                )
-                .map((reservation) => (
-                  <Box
-                    key={reservation.id}
-                    bg="white"
-                    borderWidth="2px"
-                    borderColor="gray.200"
-                    rounded="xl"
-                    shadow="lg"
-                    p={{ base: 5, md: 6 }}
-                    transition="all 0.3s"
-                    opacity={0.85}
-                  >
-                    <Stack gap={4}>
-                      {/* Header */}
-                      <Flex justify="space-between" align="start" gap={3}>
-                        <Box flex="1">
-                          <HStack gap={2} mb={2}>
-                            <Heading size="md" color="gray.700">
-                              Clubhouse
-                            </Heading>
-                          </HStack>
-                          <HStack gap={2} flexWrap="wrap">
-                            <Box
-                              as="span"
-                              px={2}
-                              py={0.5}
-                              bg="gray.100"
-                              color="gray.700"
-                              rounded="full"
-                              fontSize="xs"
-                              fontWeight="bold"
-                            >
-                              Past
-                            </Box>
-                            <Box
-                              as="span"
-                              px={2}
-                              py={0.5}
-                              bg="blue.100"
-                              color="blue.700"
-                              rounded="full"
-                              fontSize="xs"
-                              fontWeight="bold"
-                            >
-                              ${reservation.deposit || 100} Deposit
-                            </Box>
-                          </HStack>
-                        </Box>
-                      </Flex>
 
-                      {/* Details */}
-                      <Stack gap={2} fontSize="sm" color="gray.600">
-                        <Text fontWeight="semibold">
-                          Date:{" "}
-                          {new Date(reservation.date).toLocaleDateString()}
-                        </Text>
-                        <Text fontWeight="semibold">
-                          Time: {reservation.startTime} - {reservation.endTime}
-                        </Text>
-                        <Text fontWeight="semibold">
-                          Purpose: {reservation.purpose}
-                        </Text>
-                        <Text fontWeight="semibold">
-                          Payment: {reservation.paymentMethod || "Cash"}
-                        </Text>
-                      </Stack>
+            {/* Past Reservations */}
+            <Box>
+              <Heading size="md" color="navy.700" mb={4}>
+                Past Reservations
+              </Heading>
+              {clubhouseReservations.filter(
+                (r) =>
+                  r.reservedBy === user?.uid &&
+                  (r.status === "completed" || isReservationPast(r))
+              ).length === 0 ? (
+                <Box
+                  textAlign="center"
+                  py={8}
+                  bg="white"
+                  rounded="xl"
+                  shadow="md"
+                  borderWidth="1px"
+                  borderColor="gray.200"
+                >
+                  <Text fontSize="md" color="gray.600">
+                    No past reservations.
+                  </Text>
+                </Box>
+              ) : (
+                <SimpleGrid
+                  columns={{ base: 1, md: 2, lg: 3 }}
+                  gap={{ base: 4, md: 6 }}
+                >
+                  {clubhouseReservations
+                    .filter(
+                      (r) =>
+                        r.reservedBy === user?.uid &&
+                        (r.status === "completed" || isReservationPast(r))
+                    )
+                    .sort(
+                      (a, b) =>
+                        new Date(b.date).getTime() - new Date(a.date).getTime()
+                    )
+                    .map((reservation) => (
+                      <Box
+                        key={reservation.id}
+                        bg="white"
+                        borderWidth="2px"
+                        borderColor="gray.200"
+                        rounded="xl"
+                        shadow="lg"
+                        p={{ base: 5, md: 6 }}
+                        transition="all 0.3s"
+                        opacity={0.85}
+                      >
+                        <Stack gap={4}>
+                          {/* Header */}
+                          <Flex justify="space-between" align="start" gap={3}>
+                            <Box flex="1">
+                              <HStack gap={2} mb={2}>
+                                <Heading size="md" color="gray.700">
+                                  Clubhouse
+                                </Heading>
+                              </HStack>
+                              <HStack gap={2} flexWrap="wrap">
+                                <Box
+                                  as="span"
+                                  px={2}
+                                  py={0.5}
+                                  bg="gray.100"
+                                  color="gray.700"
+                                  rounded="full"
+                                  fontSize="xs"
+                                  fontWeight="bold"
+                                >
+                                  Past
+                                </Box>
+                                <Box
+                                  as="span"
+                                  px={2}
+                                  py={0.5}
+                                  bg="blue.100"
+                                  color="blue.700"
+                                  rounded="full"
+                                  fontSize="xs"
+                                  fontWeight="bold"
+                                >
+                                  ${reservation.deposit || 100} Deposit
+                                </Box>
+                              </HStack>
+                            </Box>
+                          </Flex>
 
-                      {reservation.reservedAt && (
-                        <Text fontSize="xs" color="gray.500">
-                          Requested on{" "}
-                          {new Date(
-                            reservation.reservedAt
-                          ).toLocaleDateString()}
-                        </Text>
-                      )}
-                    </Stack>
-                  </Box>
-                ))}
-            </SimpleGrid>
-          )}
-        </Box>
+                          {/* Details */}
+                          <Stack gap={2} fontSize="sm" color="gray.600">
+                            <Text fontWeight="semibold">
+                              Date:{" "}
+                              {new Date(reservation.date).toLocaleDateString()}
+                            </Text>
+                            <Text fontWeight="semibold">
+                              Time: {reservation.startTime} -{" "}
+                              {reservation.endTime}
+                            </Text>
+                            <Text fontWeight="semibold">
+                              Purpose: {reservation.purpose}
+                            </Text>
+                            <Text fontWeight="semibold">
+                              Payment: {reservation.paymentMethod || "Cash"}
+                            </Text>
+                          </Stack>
+
+                          {reservation.reservedAt && (
+                            <Text fontSize="xs" color="gray.500">
+                              Requested on{" "}
+                              {new Date(
+                                reservation.reservedAt
+                              ).toLocaleDateString()}
+                            </Text>
+                          )}
+                        </Stack>
+                      </Box>
+                    ))}
+                </SimpleGrid>
+              )}
+            </Box>
+          </>
+        )}
 
         {/* Clubhouse Booking Modal */}
         <Dialog.Root

@@ -3512,6 +3512,176 @@ We look forward to seeing you at the event!
                 Clubhouse Reservations
               </Heading>
 
+              {/* Pending Approvals List */}
+              {clubhouseReservations.filter((r) => r.status === "pending")
+                .length > 0 && (
+                <Box
+                  bg="orange.50"
+                  p={6}
+                  rounded="xl"
+                  shadow="md"
+                  borderWidth="2px"
+                  borderColor="orange.300"
+                >
+                  <Heading size="md" color="orange.700" mb={4}>
+                    Pending Approvals (
+                    {
+                      clubhouseReservations.filter(
+                        (r) => r.status === "pending"
+                      ).length
+                    }
+                    )
+                  </Heading>
+                  <Stack gap={3}>
+                    {clubhouseReservations
+                      .filter((r) => r.status === "pending")
+                      .sort(
+                        (a, b) =>
+                          new Date(a.date).getTime() -
+                          new Date(b.date).getTime()
+                      )
+                      .map((reservation) => (
+                        <Box
+                          key={reservation.id}
+                          bg="white"
+                          p={4}
+                          rounded="lg"
+                          borderWidth="1px"
+                          borderColor="gray.200"
+                          _hover={{ shadow: "md", borderColor: "orange.400" }}
+                          transition="all 0.2s"
+                        >
+                          <Flex
+                            direction={{ base: "column", md: "row" }}
+                            gap={4}
+                            align={{ base: "stretch", md: "center" }}
+                            justify="space-between"
+                          >
+                            <Stack gap={2} flex="1">
+                              <Flex gap={4} align="start" flexWrap="wrap">
+                                <Box>
+                                  <Text fontSize="xs" color="gray.600" mb={1}>
+                                    Date
+                                  </Text>
+                                  <Text fontWeight="bold" color="navy.700">
+                                    {new Date(
+                                      reservation.date
+                                    ).toLocaleDateString("en-US", {
+                                      weekday: "short",
+                                      month: "short",
+                                      day: "numeric",
+                                      year: "numeric",
+                                    })}
+                                  </Text>
+                                </Box>
+                                <Box>
+                                  <Text fontSize="xs" color="gray.600" mb={1}>
+                                    Time
+                                  </Text>
+                                  <Text fontWeight="bold" color="navy.700">
+                                    {reservation.startTime} -{" "}
+                                    {reservation.endTime}
+                                  </Text>
+                                </Box>
+                                <Box>
+                                  <Text fontSize="xs" color="gray.600" mb={1}>
+                                    Purpose
+                                  </Text>
+                                  <Text fontWeight="semibold" color="gray.700">
+                                    {reservation.purpose}
+                                  </Text>
+                                </Box>
+                              </Flex>
+                              {reservation.reservedByName && (
+                                <Box
+                                  p={2}
+                                  bg="gray.50"
+                                  rounded="md"
+                                  borderWidth="1px"
+                                  borderColor="gray.200"
+                                  mt={2}
+                                >
+                                  <Flex gap={4} flexWrap="wrap" align="center">
+                                    <Box>
+                                      <Text fontSize="xs" color="gray.600">
+                                        Requested by
+                                      </Text>
+                                      <Text
+                                        fontSize="sm"
+                                        fontWeight="bold"
+                                        color="navy.700"
+                                      >
+                                        {reservation.reservedByName}
+                                      </Text>
+                                    </Box>
+                                    <Box>
+                                      <Text fontSize="xs" color="gray.600">
+                                        Email
+                                      </Text>
+                                      <Text fontSize="sm" color="gray.700">
+                                        {reservation.reservedByEmail}
+                                      </Text>
+                                    </Box>
+                                    <Box>
+                                      <Text fontSize="xs" color="gray.600">
+                                        Payment Method
+                                      </Text>
+                                      <Text fontSize="sm" color="gray.700">
+                                        {reservation.paymentMethod || "Cash"}
+                                      </Text>
+                                    </Box>
+                                    <Box>
+                                      <Text fontSize="xs" color="gray.600">
+                                        Deposit
+                                      </Text>
+                                      <Text
+                                        fontSize="sm"
+                                        fontWeight="bold"
+                                        color="green.600"
+                                      >
+                                        ${reservation.deposit || 100}
+                                      </Text>
+                                    </Box>
+                                  </Flex>
+                                </Box>
+                              )}
+                            </Stack>
+                            <HStack
+                              gap={2}
+                              alignSelf={{ base: "stretch", md: "center" }}
+                            >
+                              <Button
+                                size="sm"
+                                bg="green.500"
+                                color="white"
+                                _hover={{ bg: "green.600" }}
+                                onClick={() =>
+                                  handleApproveReservation(reservation)
+                                }
+                                flex={{ base: 1, md: "initial" }}
+                              >
+                                Approve
+                              </Button>
+                              <Button
+                                size="sm"
+                                bg="red.500"
+                                color="white"
+                                _hover={{ bg: "red.600" }}
+                                onClick={() =>
+                                  handleRejectReservation(reservation)
+                                }
+                                flex={{ base: 1, md: "initial" }}
+                              >
+                                Reject
+                              </Button>
+                            </HStack>
+                          </Flex>
+                        </Box>
+                      ))}
+                  </Stack>
+                </Box>
+              )}
+
               {/* Summary Cards */}
               <SimpleGrid columns={{ base: 1, sm: 2, lg: 4 }} gap={4}>
                 <Box
