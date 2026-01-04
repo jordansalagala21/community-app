@@ -1151,6 +1151,67 @@ export default function ResidentPortal() {
       return;
     }
 
+    // Check for time conflicts with existing reservations
+    const requestedStartMinutes =
+      parseInt(clubhouseForm.startTime.split(":")[0]) * 60 +
+      parseInt(clubhouseForm.startTime.split(":")[1]);
+    const requestedEndMinutes =
+      parseInt(clubhouseForm.endTime.split(":")[0]) * 60 +
+      parseInt(clubhouseForm.endTime.split(":")[1]);
+
+    const conflictingReservation = clubhouseReservations.find((reservation) => {
+      // Only check approved or pending reservations on the same date
+      if (
+        reservation.date === clubhouseForm.date &&
+        (reservation.status === "approved" || reservation.status === "pending")
+      ) {
+        const existingStartMinutes =
+          parseInt(reservation.startTime.split(":")[0]) * 60 +
+          parseInt(reservation.startTime.split(":")[1]);
+        const existingEndMinutes =
+          parseInt(reservation.endTime.split(":")[0]) * 60 +
+          parseInt(reservation.endTime.split(":")[1]);
+
+        // Check if time ranges overlap
+        return (
+          (requestedStartMinutes >= existingStartMinutes &&
+            requestedStartMinutes < existingEndMinutes) ||
+          (requestedEndMinutes > existingStartMinutes &&
+            requestedEndMinutes <= existingEndMinutes) ||
+          (requestedStartMinutes <= existingStartMinutes &&
+            requestedEndMinutes >= existingEndMinutes)
+        );
+      }
+      return false;
+    });
+
+    if (conflictingReservation) {
+      const formattedDate = new Date(clubhouseForm.date).toLocaleDateString(
+        "en-US",
+        {
+          weekday: "long",
+          month: "long",
+          day: "numeric",
+          year: "numeric",
+        }
+      );
+
+      const statusText =
+        conflictingReservation.status === "approved"
+          ? "approved"
+          : "pending approval";
+
+      alert(
+        `⚠️ Time Conflict Detected\n\n` +
+          `The clubhouse is already reserved for:\n` +
+          `📅 ${formattedDate}\n` +
+          `🕐 ${conflictingReservation.startTime} - ${conflictingReservation.endTime}\n` +
+          `📋 Status: ${statusText}\n\n` +
+          `Please choose a different time or date for your reservation.`
+      );
+      return;
+    }
+
     try {
       setIsBookingClubhouse(true);
 
